@@ -4,7 +4,7 @@ steps:
   args: [
     'build', 
     '-t', 
-    'europe-west1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard/gcp-vm-dashboard-backend:$COMMIT_SHA', 
+    'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-backend-repo/gcp-vm-dashboard-backend:$COMMIT_SHA', # <--- Región y Nombre de Repo AR
     '.'
   ]
   dir: 'backend' # Importante: Indica que el Dockerfile está en la carpeta 'backend'
@@ -13,21 +13,22 @@ steps:
 - name: 'gcr.io/cloud-builders/docker'
   args: [
     'push', 
-    'europe-west1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard/gcp-vm-dashboard-backend:$COMMIT_SHA'
+    'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-backend-repo/gcp-vm-dashboard-backend:$COMMIT_SHA' # <--- Región y Nombre de Repo AR
   ]
 
 # Paso 3: Desplegar la imagen en Cloud Run
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  entrypoint: 'gcloud' # <--- ¡CORRECCIÓN CRÍTICA AQUÍ!
   args: [
-    'run', 'deploy', 'gcp-vm-dashboard-backend', # Nombre del servicio de Cloud Run
-    '--image', 'europe-west1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard/gcp-vm-dashboard-backend:$COMMIT_SHA',
-    '--region', 'europe-west1', # Tu región
+    'run', 'deploy', 'gcp-vm-dashboard-backend-service', # Nombre del servicio de Cloud Run
+    '--image', 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-backend-repo/gcp-vm-dashboard-backend:$COMMIT_SHA', # <--- Región y Nombre de Repo AR
+    '--region', 'europe-southwest1', # <--- Tu región
     '--platform', 'managed',
     '--allow-unauthenticated', # Permitir invocaciones públicas
-    '--service-account', '[NOMBRE_C780691668337-compute@developer.gserviceaccount.com]@$PROJECT_ID.iam.gserviceaccount.com', # La cuenta de servicio con roles de Compute
+    '--service-account', '780691668337-compute@developer.gserviceaccount.com', # <--- ¡CORRECCIÓN: Email completo de la cuenta de servicio!
     '--set-env-vars', 'GOOGLE_CLIENT_ID=${_GOOGLE_CLIENT_ID},JWT_SECRET=${_JWT_SECRET}' # Variables de entorno
   ]
   env:
-    - 'CLOUDSDK_COMPUTE_REGION=europe-west1' # Tu región
+    - 'CLOUDSDK_COMPUTE_REGION=europe-southwest1' # <--- Tu región
 images:
-- 'europe-west1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard/gcp-vm-dashboard-backend:$COMMIT_SHA'
+- 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-backend-repo/gcp-vm-dashboard-backend:$COMMIT_SHA' # <--- Región y Nombre de Repo AR
