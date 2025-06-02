@@ -1,0 +1,6 @@
+{
+  "name": "GCP VM Dashboard",
+  "description": "A web application to manage Google Cloud Platform Virtual Machines with a focus on clarity, efficiency, and simplicity. It allows users to view, start, stop, and get connection information for their VMs.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}
