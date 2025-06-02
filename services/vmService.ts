@@ -1,7 +1,7 @@
 // src/services/vmService.ts
 import { VirtualMachine, VMStatus } from '../types';
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = 'https://gcp-vm-dashboard-780691668337.europe-southwest1.run.app';
 
 // --- MODIFICAR FUNCIONES PARA ACEPTAR Y ENVIAR TOKEN ---
 export const fetchVMs = async (projectId: string, token: string): Promise<VirtualMachine[]> => {
