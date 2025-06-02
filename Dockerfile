@@ -2,7 +2,9 @@
 # Fase de build: Construye la aplicación React
 FROM node:20-alpine AS builder
 WORKDIR /app
-COPY package.json yarn.lock ./ # Asumiendo yarn, si usas npm, cambia a package-lock.json
+# --- ¡CORRECCIÓN EN ESTA LÍNEA! ---
+COPY package.json yarn.lock ./ 
+# --- FIN CORRECCIÓN ---
 RUN yarn install --frozen-lockfile # O npm install --omit=dev if you use npm
 COPY . .
 RUN yarn build # Vite compilará la app a la carpeta 'dist'
