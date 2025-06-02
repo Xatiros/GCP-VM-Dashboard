@@ -1,21 +1,22 @@
 # Dockerfile (para el frontend, en la raíz del repo)
+# ...
 # Fase de build: Construye la aplicación React
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY package.json package-lock.json ./ 
-RUN npm install --omit=dev 
+RUN npm install --omit=dev
 COPY . .
-RUN npm run build 
+RUN npm run build # Vite compilará la app a la carpeta 'dist'
 
 # Fase de servir: Usa Nginx para servir los archivos estáticos
 FROM nginx:stable-alpine
-COPY --from=builder /app/dist /usr/share/nginx/html
+# --- ¡VERIFICA ESTA LÍNEA! ---
+COPY --from=builder /app/dist /usr/share/nginx/html 
+# ^^^ Esto debería copiar el contenido de la carpeta 'dist'
+# al directorio web raíz de Nginx.
+# --- FIN VERIFICACIÓN ---
 
-# --- ¡CAMBIO CRÍTICO AQUÍ! Copia nginx.conf al lugar CORRECTO para sobrescribir la config por defecto ---
-# Elimina la línea 'COPY nginx.conf /etc/nginx/nginx.conf'
-# Y usa esta:
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-# ^^^ Esto sobrescribe el archivo de configuración predeterminado que Nginx carga.
+COPY nginx.conf /etc/nginx/nginx.conf 
 
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
