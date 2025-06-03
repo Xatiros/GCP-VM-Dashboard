@@ -1,18 +1,28 @@
 # Dockerfile (para el frontend, en la raíz del repo)
-
-# ... (líneas 1-3)
-FROM node:20-alpine AS frontend_builder 
-WORKDIR /app
-COPY package.json package-lock.json ./ 
-
-# --- ¡CORRECCIÓN CRÍTICA EN ESTAS LÍNEAS! ---
-# Asegúrate de que no haya comentarios en la misma línea o caracteres extra.
-# Cada RUN debe estar en su propia línea limpia.
-RUN npm install --omit=dev 
-COPY . .
-RUN npm run build 
-# --- FIN CORRECCIÓN ---
-
-# ... (resto del Dockerfile)
+# ...
 FROM nginx:stable-alpine
-# ... (resto del Dockerfile)
+# Instala envsubst que es parte de gettext
+RUN apk add --no-cache gettext 
+
+RUN rm /etc/nginx/conf.d/default.conf
+
+# Copia tu configuración personalizada de Nginx
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Copia los archivos de construcción de tu aplicación React
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# --- ¡NUEVAS LÍNEAS CLAVE AQUÍ! ---
+# Nginx por defecto escucha en el puerto 80. Cloud Run espera en 8080.
+# La variable de entorno PORT se establece automáticamente a 8080 en Cloud Run.
+# Redirigimos el tráfico del puerto 8080 del contenedor al puerto 80 de Nginx.
+ENV PORT 8080 
+EXPOSE 8080   
+
+# El entrypoint.sh se encarga de sustituir ${PORT} en el nginx.conf
+COPY entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+# Establece el script de entrada principal del contenedor
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["nginx", "-g", "daemon off;"]
