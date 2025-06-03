@@ -33,3 +33,6 @@ steps:
     - 'CLOUDSDK_COMPUTE_REGION=europe-southwest1' # Tu región
 images:
 - 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-backend/gcp-vm-dashboard-backend:$COMMIT_SHA'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
