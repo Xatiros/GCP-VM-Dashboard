@@ -47,3 +47,16 @@ steps:
     - 'CLOUDSDK_COMPUTE_REGION=europe-southwest1'
 images:
 - 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA'
+
+# cloudbuild.yaml (para el frontend, en la raíz del repo) O backend/cloudbuild.yaml
+
+steps:
+# ... (todos tus pasos existentes)
+
+images:
+# ... (tus imágenes existentes)
+
+# --- ¡AÑADE ESTA SECCIÓN! ---
+options:
+  logging: CLOUD_LOGGING_ONLY # Almacena los logs solo en Cloud Logging
+# --- FIN SECCIÓN ---
