@@ -1,15 +1,16 @@
 # cloudbuild.yaml (para el frontend, en la raíz del repo)
 steps:
-# Paso 0 (NUEVO): Limpiar node_modules y package-lock.json (ya lo teníamos, pero lo ponemos como primer paso garantizado)
+# Paso 0 (NUEVO): Limpiar node_modules y package-lock.json
 - name: 'gcr.io/cloud-builders/npm'
-  entrypoint: 'sh'
-  args: ['-c', 'rm -rf node_modules package-lock.json yarn.lock dist && npm cache clean --force'] # Limpiar TODO
+  args: ['ci'] # Usar 'ci' para instalación limpia
   dir: '.'
+  entrypoint: 'sh'
+  args: ['-c', 'rm -rf node_modules package-lock.json && npm install'] # Comando para limpiar y luego instalar
 
-# Paso 1: Instalar dependencias limpiamente
-- name: 'gcr.io/cloud-builders/npm'
-  args: ['install']
-  dir: '.' 
+# Paso 1: Instalar dependencias (este paso se podría eliminar si el paso 0 funciona bien)
+# - name: 'gcr.io/cloud-builders/npm'
+#   args: ['install']
+#   dir: '.' 
 
 # Paso 2: Construir la aplicación React
 - name: 'gcr.io/cloud-builders/npm'
@@ -38,7 +39,7 @@ steps:
   args: [
     'run', 'deploy', 'gcp-vm-dashboard-frontend-service', 
     '--image', 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA',
-    '--region', 'europe-southwest1', 
+    '--region', 'europe-southwest1',
     '--platform', 'managed',
     '--allow-unauthenticated'
   ]
