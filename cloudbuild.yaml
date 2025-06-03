@@ -1,41 +1,49 @@
 # cloudbuild.yaml (para el frontend, en la raíz del repo)
 steps:
-# Paso 1: Instalar dependencias y construir la aplicación React
+# Paso 0 (NUEVO): Limpiar node_modules y package-lock.json
 - name: 'gcr.io/cloud-builders/npm'
-  args: ['install']
-  dir: '.' # Ejecutar en la raíz del repositorio (donde está package.json del frontend)
+  args: ['ci'] # Usar 'ci' para instalación limpia
+  dir: '.'
+  entrypoint: 'sh'
+  args: ['-c', 'rm -rf node_modules package-lock.json && npm install'] # Comando para limpiar y luego instalar
 
+# Paso 1: Instalar dependencias (este paso se podría eliminar si el paso 0 funciona bien)
+# - name: 'gcr.io/cloud-builders/npm'
+#   args: ['install']
+#   dir: '.' 
+
+# Paso 2: Construir la aplicación React
 - name: 'gcr.io/cloud-builders/npm'
   args: ['run', 'build']
-  dir: '.' # Ejecutar en la raíz del repositorio
+  dir: '.'
 
-# Paso 2: Construir la imagen Docker de Nginx con los archivos de tu app
+# Paso 3: Construir la imagen Docker de Nginx con los archivos de tu app
 - name: 'gcr.io/cloud-builders/docker'
   args: [
     'build', 
     '-t', 
     'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA', 
-    '.' # Contexto de construcción: la raíz del repositorio (donde está el Dockerfile del frontend)
+    '.' 
   ]
 
-# Paso 3: Subir la imagen a Artifact Registry
+# Paso 4: Subir la imagen a Artifact Registry
 - name: 'gcr.io/cloud-builders/docker'
   args: [
     'push', 
     'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA'
   ]
 
-# Paso 4: Desplegar la imagen en Cloud Run
+# Paso 5: Desplegar la imagen en Cloud Run
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   entrypoint: 'gcloud'
   args: [
-    'run', 'deploy', 'gcp-vm-dashboard-frontend-service', # Nombre del servicio de Cloud Run
+    'run', 'deploy', 'gcp-vm-dashboard-frontend-service', 
     '--image', 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA',
-    '--region', 'europe-southwest1', # Tu región
+    '--region', 'europe-southwest1',
     '--platform', 'managed',
-    '--allow-unauthenticated' # Permitir invocaciones públicas
+    '--allow-unauthenticated'
   ]
   env:
-    - 'CLOUDSDK_COMPUTE_REGION=europe-southwest1' # Tu región
+    - 'CLOUDSDK_COMPUTE_REGION=europe-southwest1'
 images:
 - 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA'
