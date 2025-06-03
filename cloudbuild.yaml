@@ -1,23 +1,25 @@
 # cloudbuild.yaml (para el frontend, en la raíz del repo)
 steps:
-# Paso 0 (NUEVO): Limpiar node_modules y package-lock.json
+# Paso 0: Limpiar node_modules, package-lock.json, dist y caché npm
+# Se ejecuta en la raíz del repositorio, donde están los archivos del frontend.
 - name: 'gcr.io/cloud-builders/npm'
-  args: ['ci'] # Usar 'ci' para instalación limpia
-  dir: '.'
   entrypoint: 'sh'
-  args: ['-c', 'rm -rf node_modules package-lock.json && npm install'] # Comando para limpiar y luego instalar
+  args: ['-c', 'rm -rf node_modules package-lock.json yarn.lock dist && npm cache clean --force'] 
+  dir: '.'
 
-# Paso 1: Instalar dependencias (este paso se podría eliminar si el paso 0 funciona bien)
-# - name: 'gcr.io/cloud-builders/npm'
-#   args: ['install']
-#   dir: '.' 
+# Paso 1: Instalar dependencias limpiamente
+- name: 'gcr.io/cloud-builders/npm'
+  args: ['install']
+  dir: '.' 
 
-# Paso 2: Construir la aplicación React
+# Paso 2: Construir la aplicación React (Vite)
 - name: 'gcr.io/cloud-builders/npm'
   args: ['run', 'build']
   dir: '.'
 
 # Paso 3: Construir la imagen Docker de Nginx con los archivos de tu app
+# El '.' en args indica que el contexto de construcción es la raíz del repositorio,
+# donde están el Dockerfile y los archivos compilados en 'dist'.
 - name: 'gcr.io/cloud-builders/docker'
   args: [
     'build', 
@@ -35,28 +37,23 @@ steps:
 
 # Paso 5: Desplegar la imagen en Cloud Run
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-  entrypoint: 'gcloud'
+  entrypoint: 'gcloud' # Indica que 'gcloud' es el ejecutable para este paso
   args: [
-    'run', 'deploy', 'gcp-vm-dashboard-frontend-service', 
+    'run', 'deploy', 'gcp-vm-dashboard-frontend-service', # Nombre del servicio de Cloud Run
     '--image', 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA',
-    '--region', 'europe-southwest1',
+    '--region', 'europe-southwest1', # La región donde desplegarás
     '--platform', 'managed',
-    '--allow-unauthenticated'
+    '--allow-unauthenticated' # Permitir invocaciones públicas
   ]
-  env:
-    - 'CLOUDSDK_COMPUTE_REGION=europe-southwest1'
-images:
+  env: # Variables de entorno para el entorno de ejecución de este paso (no para el contenedor desplegado)
+    - 'CLOUDSDK_COMPUTE_REGION=europe-southwest1' # Asegura que gcloud usa la región correcta
+
+images: # Las imágenes Docker que se construirán y guardarán en Artifact Registry
 - 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA'
 
-# cloudbuild.yaml (para el frontend, en la raíz del repo) O backend/cloudbuild.yaml
-
-steps:
-# ... (todos tus pasos existentes)
-
-images:
-# ... (tus imágenes existentes)
-
-# --- ¡AÑADE ESTA SECCIÓN! ---
+# --- ¡SECCIÓN AÑADIDA PARA EL LOGGING! ---
+# Esto resuelve el error "If build.service_account is specified, the build must either..."
+# Indica a Cloud Build dónde almacenar los logs de esta compilación.
 options:
   logging: CLOUD_LOGGING_ONLY # Almacena los logs solo en Cloud Logging
 # --- FIN SECCIÓN ---
