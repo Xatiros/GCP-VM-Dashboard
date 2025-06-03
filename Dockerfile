@@ -1,36 +1,31 @@
 # Dockerfile (para el frontend, en la raíz del repo)
-# ...
-FROM node:20-alpine AS frontend_build_stage 
+
+# --- Fase 1: Build de la aplicación React ---
+# ¡CAMBIO CRÍTICO AQUÍ! Usar la imagen de Node.js basada en Debian completa
+FROM node:20 AS frontend_build_stage # <-- Cambiar de alpine a la versión completa
 WORKDIR /app
 COPY package.json package-lock.json ./ 
 RUN npm install --omit=dev
 COPY . . 
-# --- ¡CORRECCIÓN EN ESTA LÍNEA! ---
-RUN npm run build 
-              # O la forma más robusta:
-# RUN /usr/local/bin/npm run build # Si el PATH no se actualiza, usar la ruta completa de npm
-# O asegurar que el PATH del builder incluya .bin
+# ¡CAMBIO CRÍTICO AQUÍ! Usar npx para ejecutar vite build
+RUN npx vite build # <-- Usar npx para asegurar que vite se encuentra y ejecuta
 
-# Dado que npm run build ya debería funcionar si npm está en el PATH,
-# el problema es que npm no está completamente accesible.
-# Vamos a usar una forma más explícita o asegurar que npm esté en el PATH.
+# --- Fase 2: Servir con Nginx ---
+FROM nginx:stable-alpine
 
-# Revertir a la forma original si no había error aquí y el problema era la copia de archivos.
-# El log dice "sh: vite: not found", no "npm: not found".
+# No necesitamos 'apk add gettext' en esta fase si el entrypoint.sh ya no se usa o se ejecuta de otra forma.
+# Sin embargo, el entrypoint.sh sí se usa, así que es necesario.
+# Verificar si nginx:stable-alpine ya incluye gettext o si necesitamos añadirlo aquí.
+# Si el problema persiste, es la forma de instalar gettext.
+# Por ahora, mantengamoslo ya que ya lo tenías.
+RUN apk add --no-cache gettext 
 
-# La forma más robusta es asegurar que `vite` se ejecuta como `npm run build`.
-# Si `npm run build` falla porque `vite` no se encuentra, es que `node_modules/.bin` no está en el PATH.
-# Esto es inusual para las imágenes de Node.js.
+RUN rm /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Intentemos con la forma más robusta que se usa para asegurar que los scripts npm están disponibles:
-RUN npm install -g vite # Instalar vite globalmente en el contenedor (temporalmente para el build)
-RUN npm run build
+COPY entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
-# O la más limpia:
-# RUN npx vite build # npx ejecuta el binario localmente si está disponible
-# npx ya está incluido con npm 5.2+
-# Vamos a probar con `npx vite build` que es la forma recomendada de ejecutar binarios locales.
-RUN npx vite build # <-- ¡CAMBIO MÁS PROBABLEMENTE EFECTIVO!
-# --- FIN CORRECCIÓN ---
-
-# ... (resto del Dockerfile)
+ENTRYPOINT ["/docker-entrypoint.sh"]
+EXPOSE 8080 
+CMD ["nginx", "-g", "daemon off;"]
