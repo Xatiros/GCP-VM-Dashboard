@@ -48,6 +48,12 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// --- ¡NUEVA RUTA PARA HEALTH CHECK! ---
+app.get('/', (req, res) => {
+  res.status(200).send('OK'); // Responde con 200 OK para el health check
+});
+// --- FIN NUEVA RUTA ---
+
 // --- BLOQUE DE INICIALIZACIÓN DE CLIENTES DE COMPUTE ENGINE (EXISTENTE) ---
 // ... (Mantener este bloque tal cual, sin cambios)
 let instancesClient;
