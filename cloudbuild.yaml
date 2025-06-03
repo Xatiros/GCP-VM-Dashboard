@@ -1,34 +1,41 @@
+# cloudbuild.yaml (para el frontend, en la raíz del repo)
 steps:
-# Paso 1: Construir la imagen Docker
+# Paso 1: Instalar dependencias y construir la aplicación React
+- name: 'gcr.io/cloud-builders/npm'
+  args: ['install']
+  dir: '.' # Ejecutar en la raíz del repositorio (donde está package.json del frontend)
+
+- name: 'gcr.io/cloud-builders/npm'
+  args: ['run', 'build']
+  dir: '.' # Ejecutar en la raíz del repositorio
+
+# Paso 2: Construir la imagen Docker de Nginx con los archivos de tu app
 - name: 'gcr.io/cloud-builders/docker'
   args: [
     'build', 
     '-t', 
-    'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-backend/gcp-vm-dashboard-backend:$COMMIT_SHA', # <--- Región y Nombre de Repo AR
-    '.'
+    'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA', 
+    '.' # Contexto de construcción: la raíz del repositorio (donde está el Dockerfile del frontend)
   ]
-  dir: 'backend' # Importante: Indica que el Dockerfile está en la carpeta 'backend'
 
-# Paso 2: Subir la imagen a Artifact Registry
+# Paso 3: Subir la imagen a Artifact Registry
 - name: 'gcr.io/cloud-builders/docker'
   args: [
     'push', 
-    'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-backend/gcp-vm-dashboard-backend:$COMMIT_SHA' # <--- Región y Nombre de Repo AR
+    'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA'
   ]
 
-# Paso 3: Desplegar la imagen en Cloud Run
+# Paso 4: Desplegar la imagen en Cloud Run
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-  entrypoint: 'gcloud' # <--- ¡CORRECCIÓN CRÍTICA AQUÍ!
+  entrypoint: 'gcloud'
   args: [
-    'run', 'deploy', 'gcp-vm-dashboard-backend-service', # Nombre del servicio de Cloud Run
-    '--image', 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-backend/gcp-vm-dashboard-backend:$COMMIT_SHA', # <--- Región y Nombre de Repo AR
-    '--region', 'europe-southwest1', # <--- Tu región
+    'run', 'deploy', 'gcp-vm-dashboard-frontend-service', # Nombre del servicio de Cloud Run
+    '--image', 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA',
+    '--region', 'europe-southwest1', # Tu región
     '--platform', 'managed',
-    '--allow-unauthenticated', # Permitir invocaciones públicas
-    '--service-account', '780691668337-compute@developer.gserviceaccount.com', # <--- ¡CORRECCIÓN: Email completo de la cuenta de servicio!
-    '--set-env-vars', 'GOOGLE_CLIENT_ID=${_GOOGLE_CLIENT_ID},JWT_SECRET=${_JWT_SECRET}' # Variables de entorno
+    '--allow-unauthenticated' # Permitir invocaciones públicas
   ]
   env:
-    - 'CLOUDSDK_COMPUTE_REGION=europe-southwest1' # <--- Tu región
+    - 'CLOUDSDK_COMPUTE_REGION=europe-southwest1' # Tu región
 images:
-- 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-backend/gcp-vm-dashboard-backend:$COMMIT_SHA' # <--- Región y Nombre de Repo AR
+- 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA'
