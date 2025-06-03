@@ -1,7 +1,6 @@
 # cloudbuild.yaml (para el frontend, en la raíz del repo)
 steps:
 # Paso 0: Limpiar node_modules, package-lock.json, dist y caché npm
-# Se ejecuta en la raíz del repositorio, donde están los archivos del frontend.
 - name: 'gcr.io/cloud-builders/npm'
   entrypoint: 'sh'
   args: ['-c', 'rm -rf node_modules package-lock.json yarn.lock dist && npm cache clean --force'] 
@@ -12,14 +11,12 @@ steps:
   args: ['install']
   dir: '.' 
 
-# Paso 2: Construir la aplicación React (Vite)
+# Paso 2: Construir la aplicación React
 - name: 'gcr.io/cloud-builders/npm'
   args: ['run', 'build']
   dir: '.'
 
 # Paso 3: Construir la imagen Docker de Nginx con los archivos de tu app
-# El '.' en args indica que el contexto de construcción es la raíz del repositorio,
-# donde están el Dockerfile y los archivos compilados en 'dist'.
 - name: 'gcr.io/cloud-builders/docker'
   args: [
     'build', 
@@ -37,23 +34,15 @@ steps:
 
 # Paso 5: Desplegar la imagen en Cloud Run
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-  entrypoint: 'gcloud' # Indica que 'gcloud' es el ejecutable para este paso
+  entrypoint: 'gcloud'
   args: [
-    'run', 'deploy', 'gcp-vm-dashboard-frontend-service', # Nombre del servicio de Cloud Run
+    'run', 'deploy', 'gcp-vm-dashboard-frontend-service', 
     '--image', 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA',
-    '--region', 'europe-southwest1', # La región donde desplegarás
+    '--region', 'europe-southwest1', 
     '--platform', 'managed',
-    '--allow-unauthenticated' # Permitir invocaciones públicas
+    '--allow-unauthenticated'
   ]
-  env: # Variables de entorno para el entorno de ejecución de este paso (no para el contenedor desplegado)
-    - 'CLOUDSDK_COMPUTE_REGION=europe-southwest1' # Asegura que gcloud usa la región correcta
-
-images: # Las imágenes Docker que se construirán y guardarán en Artifact Registry
+  env:
+    - 'CLOUDSDK_COMPUTE_REGION=europe-southwest1'
+images:
 - 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA'
-
-# --- ¡SECCIÓN AÑADIDA PARA EL LOGGING! ---
-# Esto resuelve el error "If build.service_account is specified, the build must either..."
-# Indica a Cloud Build dónde almacenar los logs de esta compilación.
-options:
-  logging: CLOUD_LOGGING_ONLY # Almacena los logs solo en Cloud Logging
-# --- FIN SECCIÓN ---
