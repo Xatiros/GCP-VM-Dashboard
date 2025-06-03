@@ -6,7 +6,7 @@ COPY package.json package-lock.json ./
 RUN npm install --omit=dev
 COPY . . 
 # --- ¡CORRECCIÓN EN ESTA LÍNEA! ---
-RUN npm build # Cambia 'npm run build' a 'npm build' (npm build es un alias para npm run build)
+RUN npm run build 
               # O la forma más robusta:
 # RUN /usr/local/bin/npm run build # Si el PATH no se actualiza, usar la ruta completa de npm
 # O asegurar que el PATH del builder incluya .bin
