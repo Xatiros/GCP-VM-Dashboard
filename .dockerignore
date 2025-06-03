@@ -1,0 +1,8 @@
+# .dockerignore
+.git
+node_modules/
+dist/
+.env
+.env.local
+# Si tienes la keyfile.json en la raíz del frontend (no recomendado)
+# keyfile.json 
