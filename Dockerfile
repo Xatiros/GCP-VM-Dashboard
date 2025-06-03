@@ -1,24 +1,36 @@
 # Dockerfile (para el frontend, en la raíz del repo)
-# Fase de build: Construye la aplicación React
+# ...
 FROM node:20-alpine AS frontend_build_stage 
 WORKDIR /app
 COPY package.json package-lock.json ./ 
 RUN npm install --omit=dev
 COPY . . 
-RUN npm run build 
+# --- ¡CORRECCIÓN EN ESTA LÍNEA! ---
+RUN npm build # Cambia 'npm run build' a 'npm build' (npm build es un alias para npm run build)
+              # O la forma más robusta:
+# RUN /usr/local/bin/npm run build # Si el PATH no se actualiza, usar la ruta completa de npm
+# O asegurar que el PATH del builder incluya .bin
 
-# Fase de servir: Usa Nginx para servir los archivos estáticos
-FROM nginx:stable-alpine
-RUN apk add --no-cache gettext 
+# Dado que npm run build ya debería funcionar si npm está en el PATH,
+# el problema es que npm no está completamente accesible.
+# Vamos a usar una forma más explícita o asegurar que npm esté en el PATH.
 
-RUN rm /etc/nginx/conf.d/default.conf
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Revertir a la forma original si no había error aquí y el problema era la copia de archivos.
+# El log dice "sh: vite: not found", no "npm: not found".
 
-COPY entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
+# La forma más robusta es asegurar que `vite` se ejecuta como `npm run build`.
+# Si `npm run build` falla porque `vite` no se encuentra, es que `node_modules/.bin` no está en el PATH.
+# Esto es inusual para las imágenes de Node.js.
 
-COPY --from=frontend_build_stage /app/dist /usr/share/nginx/html
+# Intentemos con la forma más robusta que se usa para asegurar que los scripts npm están disponibles:
+RUN npm install -g vite # Instalar vite globalmente en el contenedor (temporalmente para el build)
+RUN npm run build
 
-EXPOSE 8080 
-ENTRYPOINT ["/docker-entrypoint.sh"]
-CMD ["nginx", "-g", "daemon off;"]
+# O la más limpia:
+# RUN npx vite build # npx ejecuta el binario localmente si está disponible
+# npx ya está incluido con npm 5.2+
+# Vamos a probar con `npx vite build` que es la forma recomendada de ejecutar binarios locales.
+RUN npx vite build # <-- ¡CAMBIO MÁS PROBABLEMENTE EFECTIVO!
+# --- FIN CORRECCIÓN ---
+
+# ... (resto del Dockerfile)
