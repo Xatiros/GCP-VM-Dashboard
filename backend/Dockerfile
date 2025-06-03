@@ -1,11 +1,8 @@
 # backend/Dockerfile
-FROM node:20-slim 
+FROM node:20-slim
 WORKDIR /usr/src/app
-COPY package*.json ./
-# --- AÑADIR ESTA LÍNEA PARA ACTUALIZAR NPM ---
-RUN npm install -g npm@latest
-# --- FIN AÑADIR ---
-RUN npm install --omit=dev
+COPY package.json package-lock.json ./
+RUN npm install --omit=dev # O yarn install
 COPY . .
 ENV PORT 8080
 EXPOSE $PORT
