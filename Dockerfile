@@ -12,13 +12,9 @@ RUN npm run build
 FROM nginx:stable-alpine
 
 # Elimina el archivo de configuración por defecto si existe (aunque ahora lo sobrescribiremos)
-RUN rm /etc/nginx/conf.d/default.conf || true
+RUN rm -rf /etc/nginx/conf.d/ || true
 
-# --- ¡CAMBIO CRÍTICO AQUÍ! Copia nginx.conf al archivo de configuración principal ---
 COPY nginx.conf /etc/nginx/nginx.conf 
-# ^^^ Esto sobrescribe la configuración principal de Nginx.
-# Como resultado, Nginx no buscará en /etc/nginx/conf.d/default.conf
-# a menos que tu nginx.conf lo incluya explícitamente.
 
 # Copia los archivos de construcción de tu aplicación React
 COPY --from=frontend_build_stage /app/dist /usr/share/nginx/html
