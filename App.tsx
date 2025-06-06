@@ -9,11 +9,10 @@ import { fetchVMs as apiFetchVMs, startVM as apiStartVM, stopVM as apiStopVM } f
 import { RefreshIcon, SearchIcon } from './components/icons';
 import { AuthButton } from './components/AuthButton';
 
-const BACKEND_AUTH_ENDPOINT_URL = process.env.VITE_APP_BACKEND_AUTH_URL;
+// const BACKEND_AUTH_ENDPOINT_URL = process.env.VITE_APP_BACKEND_AUTH_URL;
 // Define la URL de autenticación del backend
 // Usamos process.env porque es así como Vite las expone después de 'define'
-// const BACKEND_AUTH_ENDPOINT_URL = process.env.VITE_APP_BACKEND_AUTH_URL || 'http://localhost:3001/api/auth/google'; // Fallback para desarrollo local
-
+const BACKEND_AUTH_ENDPOINT_URL = process.env.VITE_APP_BACKEND_AUTH_URL || 'http://localhost:3001/api/auth/google'; 
 const App: React.FC = () => {
   const [vms, setVms] = useState<VirtualMachine[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
