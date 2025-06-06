@@ -1,26 +1,59 @@
-# Ejemplo de un cloudbuild.yaml para el frontend (si no lo tienes, créalo o adapta tu flujo)
+# cloudbuild.yaml (para el frontend, en la raíz del repo)
 steps:
+# Paso 0: Limpiar node_modules, package-lock.json, dist y caché npm
+# Se ejecuta en la raíz del repositorio, donde están los archivos del frontend.
+- name: 'gcr.io/cloud-builders/npm'
+  entrypoint: 'sh'
+  args: ['-c', 'rm -rf node_modules package-lock.json yarn.lock dist && npm cache clean --force'] 
+  dir: '.'
+
+# Paso 1: Instalar dependencias limpiamente
 - name: 'gcr.io/cloud-builders/npm'
   args: ['install']
-  dir: '.' # Asegúrate de que este es el directorio raíz de tu frontend
+  dir: '.' 
+
+# Paso 2: Construir la aplicación React (Vite)
 - name: 'gcr.io/cloud-builders/npm'
   args: ['run', 'build']
-  dir: '.' # Asegúrate de que este es el directorio raíz de tu frontend
-  env:
-    # Estas variables las usarás en App.tsx a través de process.env.VITE_APP_...
-    # Si tienes variables de sustitución en Cloud Build (ej. para secretos), úsalas aquí:
-    - 'VITE_APP_API_KEY=${_GEMINI_API_KEY}' # Ejemplo si GEMINI_API_KEY viene como sustitución
-    - 'VITE_APP_GEMINI_API_KEY=${_GEMINI_API_KEY}' # Ejemplo
-    - 'VITE_APP_BACKEND_AUTH_URL=https://gcp-vm-dashboard-backend-service-780691668337.europe-southwest1.run.app/api/auth/google' # <--- ¡CRÍTICO!
-# ...
-# Paso para construir la imagen Docker del frontend
+  dir: '.'
+
+# Paso 3: Construir la imagen Docker de Nginx con los archivos de tu app
+# El '.' en args indica que el contexto de construcción es la raíz del repositorio,
+# donde están el Dockerfile y los archivos compilados en 'dist'.
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['build', '-t', 'europe-southwest1-docker.pkg.dev/puestos-de-trabajo-potentes/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:${_GIT_TAG}', '.']
-  dir: '.' # Asegúrate de que este es el directorio raíz de tu frontend
-# Paso para desplegar en Cloud Run
+  args: [
+    'build', 
+    '-t', 
+    'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA', 
+    '.' 
+  ]
+
+# Paso 4: Subir la imagen a Artifact Registry
+- name: 'gcr.io/cloud-builders/docker'
+  args: [
+    'push', 
+    'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA'
+  ]
+
+# Paso 5: Desplegar la imagen en Cloud Run
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-  entrypoint: 'gcloud'
-  args: ['run', 'deploy', 'gcp-vm-dashboard-frontend-service', '--image', 'europe-southwest1-docker.pkg.dev/puestos-de-trabajo-potentes/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:${_GIT_TAG}', '--region', 'europe-southwest1', '--platform', 'managed', '--port', '8080']
-  dir: '.' # Asegúrate de que este es el directorio raíz de tu frontend
-images:
-- 'europe-southwest1-docker.pkg.dev/puestos-de-trabajo-potentes/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:${_GIT_TAG}'
+  entrypoint: 'gcloud' # Indica que 'gcloud' es el ejecutable para este paso
+  args: [
+    'run', 'deploy', 'gcp-vm-dashboard-frontend-service', # Nombre del servicio de Cloud Run
+    '--image', 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA',
+    '--region', 'europe-southwest1', # La región donde desplegarás
+    '--platform', 'managed',
+    '--allow-unauthenticated' # Permitir invocaciones públicas
+  ]
+  env: # Variables de entorno para el entorno de ejecución de este paso (no para el contenedor desplegado)
+    - 'CLOUDSDK_COMPUTE_REGION=europe-southwest1' # Asegura que gcloud usa la región correcta
+
+images: # Las imágenes Docker que se construirán y guardarán en Artifact Registry
+- 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA'
+
+# --- ¡SECCIÓN QUE DEBE ESTAR! ---
+# Esto resuelve el error "If build.service_account is specified, the build must either..."
+# Indica a Cloud Build dónde almacenar los logs de esta compilación.
+options:
+  logging: CLOUD_LOGGING_ONLY # Almacena los logs solo en Cloud Logging
+# --- FIN SECCIÓN ---
