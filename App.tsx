@@ -1,4 +1,4 @@
-// frontend/App.tsx
+// src/App.tsx
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Header } from './components/Header';
 import { VMList } from './components/VMList';
@@ -12,9 +12,7 @@ import { AuthButton } from './components/AuthButton';
 
 // Define la URL de autenticación del backend
 // Usamos process.env porque es así como Vite las expone después de 'define'
-// La variable de entorno VITE_APP_BACKEND_AUTH_URL se inyectará durante la compilación.
-// El '||' es un fallback para desarrollo local si la variable no está definida.
-const BACKEND_AUTH_ENDPOINT_URL = process.env.VITE_APP_BACKEND_AUTH_URL || 'http://localhost:3001/api/auth/google'; //
+const BACKEND_AUTH_ENDPOINT_URL = process.env.VITE_APP_BACKEND_AUTH_URL || 'http://localhost:3001/api/auth/google'; 
 
 const App: React.FC = () => {
   const [vms, setVms] = useState<VirtualMachine[]>([]);
@@ -29,6 +27,7 @@ const App: React.FC = () => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const pollingTimers = useRef<{ [key: string]: NodeJS.Timeout }>({});
+  const mainPollingTimer = useRef<NodeJS.Timeout | null>(null); // Nuevo: para el polling general
 
   // --- ESTADO DE AUTENTICACIÓN ---
   const [appToken, setAppToken] = useState<string | null>(localStorage.getItem('appToken'));
@@ -53,6 +52,16 @@ const App: React.FC = () => {
     setTimeout(() => setToastMessage(null), 3000); 
   };
 
+  // Funcion de logout (necesita estar dentro de useCallback si es una dependencia)
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem('appToken');
+    localStorage.removeItem('userEmail');
+    setAppToken(null); 
+    setUserEmail(null);
+    setVms([]); 
+    showToast('Sesión cerrada.');
+  }, []); // No tiene dependencias externas, solo las funciones de set estado
+
   const loadVMs = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -68,28 +77,68 @@ const App: React.FC = () => {
       console.error("Error al cargar VMs en el frontend:", err);
       showToast('Error al cargar VMs.');
       if (errorMessage.includes('No autorizado') || errorMessage.includes('sesión expirada')) {
-        handleLogout();
+        handleLogout(); // Se usa aquí la version de useCallback
       }
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProject, appToken]);
+  }, [selectedProject, appToken, handleLogout]); 
 
-  useEffect(() => {
-    if (appToken) { 
-      loadVMs();
-    }
-  }, [loadVMs, appToken]); 
 
+  // NUEVO useEffect para el polling general de VMs
+  useEffect(() => {
+    if (appToken) {
+      // Función para iniciar el polling principal
+      const startMainPolling = () => {
+        if (mainPollingTimer.current) { // Limpia el temporizador anterior si ya existe
+          clearTimeout(mainPollingTimer.current);
+        }
+        mainPollingTimer.current = setTimeout(async () => {
+          await loadVMs(); // Llama a loadVMs para actualizar el estado
+          startMainPolling(); // Vuelve a programar la siguiente llamada después del intervalo
+        }, 15000); // Poll cada 15 segundos (puedes ajustar este valor)
+      };
+
+      loadVMs(); // Carga las VMs inmediatamente al autenticarse
+      startMainPolling(); // Inicia el ciclo de polling
+
+    } else {
+      // Si el usuario no está autenticado, detén cualquier polling activo
+      if (mainPollingTimer.current) {
+        clearTimeout(mainPollingTimer.current);
+        mainPollingTimer.current = null;
+      }
+      setVms([]); // Limpiar VMs si no hay token
+    }
+
+    // Función de limpieza para cuando el componente se desmonte o appToken cambie
+    return () => {
+      if (mainPollingTimer.current) {
+        clearTimeout(mainPollingTimer.current);
+        mainPollingTimer.current = null;
+      }
+      // También limpia los timers de polling de VMs individuales si persisten
+      for (const vmId in pollingTimers.current) {
+        clearTimeout(pollingTimers.current[vmId]);
+      }
+      pollingTimers.current = {};
+    };
+  }, [appToken, loadVMs]); // Dependencias: se ejecuta cuando appToken o loadVMs cambian
+
+
+  // Tu funcion startPollingVMStatus, ajustada ligeramente
   const startPollingVMStatus = useCallback((vmId: string, expectedFinalStatus: VMStatus) => {
     if (pollingTimers.current[vmId]) {
       clearTimeout(pollingTimers.current[vmId]);
     }
 
     const poll = async () => {
+      // Optimizacion: en lugar de loadVMs() que recarga todo, puedes recargar solo esta VM
+      // Pero para simplificar y usar tu funcion existente, loadVMs() esta bien por ahora.
+      // Si la carga de todas las VMs es costosa, se puede optimizar aquí.
       await loadVMs(); 
       
-      const currentVm = vms.find(vm => vm.id === vmId);
+      const currentVm = vms.find(vm => vm.id === vmId); // Busca en el estado Vms actualizado
 
       const isFinalState = (status: VMStatus | string) => 
         status === VMStatus.RUNNING || status === VMStatus.STOPPED || 
@@ -112,8 +161,10 @@ const App: React.FC = () => {
       for (const vmId in pollingTimers.current) {
         clearTimeout(pollingTimers.current[vmId]);
       }
+      // La limpieza del mainPollingTimer ahora está en el useEffect principal, no es necesaria aquí.
     };
   }, []);
+
 
   const handleStartVM = async (vmId: string) => {
     const vmToStart = vms.find(vm => vm.id === vmId);
@@ -191,7 +242,7 @@ const App: React.FC = () => {
     setIsAuthenticating(true);
     setError(null);
     try {
-      const response = await fetch(BACKEND_AUTH_ENDPOINT_URL, { //
+      const response = await fetch(BACKEND_AUTH_ENDPOINT_URL, { 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -219,15 +270,6 @@ const App: React.FC = () => {
     } finally {
       setIsAuthenticating(false);
     }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('appToken');
-    localStorage.removeItem('userEmail');
-    setAppToken(null); 
-    setUserEmail(null);
-    setVms([]); 
-    showToast('Sesión cerrada.');
   };
 
 
@@ -381,6 +423,7 @@ const App: React.FC = () => {
           onClose={() => setSelectedVMForConnect(null)}
           onCopyToClipboard={handleCopyToClipboard}
           projectId={selectedProject.id}
+          appToken={appToken} {/* Pasar el appToken a ConnectModal */}
         />
       )}
       {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage(null)} />}
