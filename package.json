@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "VITE_BACKEND_API_URL=https://gcp-vm-dashboard-backend-service-780691668337.europe-southwest1.run.app vite build",
+    "dev": "vite",  
+  "build": "VITE_APP_BACKEND_AUTH_URL=https://gcp-vm-dashboard-backend-service-780691668337.europe-southwest1.run.app/api/auth/google vite build", 
     "preview": "vite preview"
   },
   "dependencies": {

@@ -1,3 +1,4 @@
+// frontend/App.tsx
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Header } from './components/Header';
 import { VMList } from './components/VMList';
@@ -9,10 +10,12 @@ import { fetchVMs as apiFetchVMs, startVM as apiStartVM, stopVM as apiStopVM } f
 import { RefreshIcon, SearchIcon } from './components/icons';
 import { AuthButton } from './components/AuthButton';
 
-// const BACKEND_AUTH_ENDPOINT_URL = process.env.VITE_APP_BACKEND_AUTH_URL;
 // Define la URL de autenticación del backend
 // Usamos process.env porque es así como Vite las expone después de 'define'
-const BACKEND_AUTH_ENDPOINT_URL = process.env.VITE_APP_BACKEND_AUTH_URL || 'http://localhost:3001/api/auth/google'; 
+// La variable de entorno VITE_APP_BACKEND_AUTH_URL se inyectará durante la compilación.
+// El '||' es un fallback para desarrollo local si la variable no está definida.
+const BACKEND_AUTH_ENDPOINT_URL = process.env.VITE_APP_BACKEND_AUTH_URL || 'http://localhost:3001/api/auth/google'; //
+
 const App: React.FC = () => {
   const [vms, setVms] = useState<VirtualMachine[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -20,7 +23,7 @@ const App: React.FC = () => {
   
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<VMStatus | 'ALL'>('ALL');
-  const [zoneFilter, setZoneFilter] = useState<string | 'ALL'>('ALL'); // Corregido doble declaración de setZoneFilter
+  const [zoneFilter, setZoneFilter] = useState<string | 'ALL'>('ALL'); 
   
   const [selectedVMForConnect, setSelectedVMForConnect] = useState<VirtualMachine | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -188,7 +191,7 @@ const App: React.FC = () => {
     setIsAuthenticating(true);
     setError(null);
     try {
-      const response = await fetch(BACKEND_AUTH_ENDPOINT_URL, { // <--- CORRECCIÓN AQUÍ
+      const response = await fetch(BACKEND_AUTH_ENDPOINT_URL, { //
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
