@@ -15,7 +15,7 @@ const port = process.env.PORT || 8080; // Usar 8080 como fallback consistente co
 // --- CONFIGURACIÓN DE AUTENTICACIÓN ---
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID; 
 const JWT_SECRET = process.env.JWT_SECRET || '1823ca911266eafe96c0b42a9331fc097b1a84a974e4e206208685d93dc37bddd2c68fa9a094548da1ad5a3f3936a9fc1d5b6d7d80c684494c60654c07bb197984f34ac1e6ea34ce3d9a6a4e89a3dfbbb1081c1bf5752102e9bf782e3bd3c1711f83035b2c0248c32be814eefa615590b0eb7c946d0adfed5cc4f726eb0ec343a8859c91b4fcb7f7b91e5e2cc626daf4bfb3bcc81298177f494f21fb8d9068b76ebcde811d097152761203e03550c60bc2052130fae3411baf5a5b7d333d6497795fea3e5ad8132ba2508644ed73c394c1046936aa1ad9e994da6f6dd6610ac80bfc9adff55009d401033917daee194fbbdcc1c38732be40e83b8bd35f66f5e5'; 
-const ALLOWED_DOMAIN = 'gemigeo.com';
+const ALLOWED_DOMAIN = ['gemigeo.com' , 'igeotest.com'];
 
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
