@@ -74,7 +74,7 @@ const GCP_PROJECT_ID = process.env.GCP_PROJECT_ID;
 // ¡VALIDACIÓN CRÍTICA! Asegura que el ID del proyecto esté definido
 if (!GCP_PROJECT_ID) {
     console.error("Error fatal: La variable de entorno GCP_PROJECT_ID no está definida.");
-    process.exit(1); // Sale si el ID del proyecto no está disponible
+    process.exit(1); // Termina la aplicación si falta el ID del proyecto
 }
 
 // 1. Inicializar el Cliente de Instancias (InstancesClient)
