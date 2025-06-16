@@ -17,7 +17,8 @@ export interface VirtualMachine {
   externalIp?: string;
   internalIp: string;
   machineType: string;
-  creationTimestamp?: string; 
+  creationTimestamp?: string;
+  isWindows?: boolean; 
 }
 
 export interface GCPProject {
