@@ -1,6 +1,7 @@
 import React from 'react';
 import { VirtualMachine, VMStatus } from '../types';
 import { PowerIcon, StopIcon, LinkIcon, ChipIcon, LocationMarkerIcon, ClipboardCopyIcon, CogIcon } from './icons';
+import { TerminalIcon } from './icons'; // Asegúrate de importar TerminalIcon si lo usas, si no, puedes eliminar esta línea si no está en icons.tsx
 
 interface VMCardProps {
   vm: VirtualMachine;
@@ -8,8 +9,75 @@ interface VMCardProps {
   onStop: (vmId: string) => void;
   onConnect: (vm: VirtualMachine) => void; // onConnect ahora espera la VM completa
   onCopyToClipboard: (text: string, type: string) => void;
-  projectId: string; // Asegúrate de que esta prop se sigue pasando desde App.tsx
+  projectId: string; // Necesario para el modal de conexión
 }
+
+// Mini-componente para el Popover de Comandos SSH/gcloud
+interface ConnectionCommandsPopoverProps {
+  vm: VirtualMachine;
+  projectId: string;
+  onCopyToClipboard: (text: string, type: string) => void;
+  onClose: () => void; // Para cerrar el popover al hacer clic fuera
+}
+
+const ConnectionCommandsPopover: React.FC<ConnectionCommandsPopoverProps> = ({ vm, projectId, onCopyToClipboard, onClose }) => {
+  const sshCommand = vm.externalIp ? `ssh your_user@${vm.externalIp}` : 'N/A (No External IP)';
+  const gcloudCommand = `gcloud compute ssh ${vm.name} --zone=${vm.zone} --project=${projectId}`;
+
+  // Usar useRef para el popover y detectar clics fuera
+  const popoverRef = React.useRef<HTMLDivElement>(null); 
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
+        onClose(); // Cierra el popover si el clic no fue dentro de él
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [onClose]);
+
+  return (
+    <div ref={popoverRef} className="absolute top-full right-0 mt-2 w-72 bg-white rounded-lg shadow-lg z-20 border border-gray-200 p-4">
+      <h4 className="font-semibold text-gray-800 mb-2">Comandos de Conexión Adicionales:</h4>
+      
+      {/* Opción Via SSH (External IP) */}
+      <div className="mb-3">
+        <p className="font-medium text-gray-700">Via SSH (IP Externa):</p>
+        <div className="mt-1 flex items-center bg-gray-100 p-2 rounded-md text-xs">
+          <code className="text-gray-700 flex-grow select-all break-all">{sshCommand}</code>
+          <button
+            onClick={() => onCopyToClipboard(sshCommand, 'Comando SSH')}
+            title="Copiar Comando SSH"
+            className="ml-2 p-1 text-gray-500 hover:text-gcp-blue rounded hover:bg-gray-200"
+          >
+            <ClipboardCopyIcon className="h-4 w-4" />
+          </button>
+        </div>
+        <p className="mt-1 text-xs text-gray-500">Reemplaza <code>your_user</code> con tu usuario en la VM.</p>
+        {!vm.externalIp && <p className="mt-1 text-xs text-yellow-600">VM sin IP externa.</p>}
+      </div>
+
+      {/* Opción Via Google Cloud Shell (gcloud) */}
+      <div>
+        <p className="font-medium text-gray-700">Via Google Cloud Shell (gcloud):</p>
+        <div className="mt-1 flex items-center bg-gray-100 p-2 rounded-md text-xs">
+          <code className="text-gray-700 flex-grow select-all break-all">{gcloudCommand}</code>
+          <button
+            onClick={() => onCopyToClipboard(gcloudCommand, 'Comando gcloud')}
+            title="Copiar Comando gcloud"
+            className="ml-2 p-1 text-gray-500 hover:text-gcp-blue rounded hover:bg-gray-200"
+          >
+            <ClipboardCopyIcon className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+      
+    </div>
+  );
+};
+
 
 const StatusIndicator: React.FC<{ status: VMStatus | string }> = ({ status }) => {
   let bgColor = 'bg-gray-400';
@@ -77,10 +145,8 @@ const StatusIndicator: React.FC<{ status: VMStatus | string }> = ({ status }) =>
 };
 
 
-export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, onCopyToClipboard, projectId }) => { // projectId añadido a las props
-  // Ya no necesitamos showPopover ni isHovered
-  // const [showPopover, setShowPopover] = React.useState(false); 
-  // const popoverRef = React.useRef<HTMLDivElement>(null); 
+export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, onCopyToClipboard, projectId }) => {
+  const [showPopover, setShowPopover] = React.useState(false); 
 
   const isActuallyStopped = vm.status === VMStatus.STOPPED || vm.status === 'FINALIZADO' || vm.status === 'TERMINATED' || vm.status === 'PARADA';
   const isActuallyRunning = vm.status === VMStatus.RUNNING || vm.status === 'CORRER';
@@ -88,7 +154,8 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
 
   const canStart = isActuallyStopped && !isStartingOrStopping;
   const canStop = isActuallyRunning && !isStartingOrStopping;
-  const canConnect = isActuallyRunning && !isStartingOrStopping; // Habilitar el botón Conectar
+  const canConnectBrowser = isActuallyRunning && !isStartingOrStopping; // Habilita el botón Conectar (SSH en navegador)
+  const canShowOtherConnectOptions = isActuallyRunning && !isStartingOrStopping; // Habilita el botón de "más opciones"
 
   // Determinar la clase CSS del botón de acción (verde/rojo o gris)
   const getActionButtonClass = (isEnabled: boolean, baseColor: string) => 
@@ -118,7 +185,27 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
       <div className="p-5 border-b border-gray-200">
         <div className="flex justify-between items-center relative"> 
           <h3 className="text-xl font-bold text-gray-800 truncate" title={vm.name}>{vm.name}</h3>
-          {/* Ya no hay botón de "más opciones" aquí, todo en el modal principal */}
+          {/* Botón de "Más opciones de conexión" (TerminalIcon) */}
+          {canShowOtherConnectOptions && (
+            <button 
+              onClick={() => setShowPopover(!showPopover)} 
+              disabled={isStartingOrStopping} 
+              className="ml-2 p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400"
+              title="Más opciones de conexión"
+              aria-expanded={showPopover}
+              aria-haspopup="true"
+            >
+              <TerminalIcon className="h-6 w-6" /> {/* Icono para "más opciones" */}
+            </button>
+          )}
+          {showPopover && (
+            <ConnectionCommandsPopover 
+              vm={vm} 
+              projectId={projectId} 
+              onCopyToClipboard={onCopyToClipboard} 
+              onClose={() => setShowPopover(false)} 
+            />
+          )}
         </div>
         <div className="mt-1">
           <StatusIndicator status={vm.status} />
@@ -189,7 +276,7 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
           {/* Botón Conectar (este botón ahora abre el modal unificado de conexión) */}
           <button
             onClick={() => onConnect(vm)} {/* Pasa la VM completa a onConnect */}
-            disabled={!canConnect} // Habilitado si canConnect es true
+            disabled={!canConnectBrowser} // Habilitado si canConnectBrowser es true
             className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gcp-blue disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <LinkIcon className="h-5 w-5 mr-1" />
@@ -198,8 +285,8 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
         </div>
 
         {/* Si la VM está en transición o no es accionable, mostrar un botón de estado deshabilitado */}
-        { isStartingOrStopping || (!canStart && !canStop && !canConnect) ? ( // Si está en transición, O no puede ni encender, ni apagar, ni conectar
-            <div className="flex space-x-2 mt-2 w-full"> {/* Usamos w-full para que ocupe todo el ancho */}
+        { isStartingOrStopping || (!canStart && !canStop && !canConnectBrowser) ? ( 
+            <div className="flex space-x-2 mt-2 w-full"> 
                 <button
                 disabled
                 className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-500 bg-gray-200 cursor-not-allowed"

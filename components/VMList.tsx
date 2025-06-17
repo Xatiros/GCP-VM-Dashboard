@@ -8,7 +8,7 @@ interface VMListProps {
   onStopVM: (vmId:string) => void;
   onConnectVM: (vm: VirtualMachine) => void;
   onCopyToClipboard: (text: string, type: string) => void;
-  projectId: string; // ¡NUEVA PROP!
+  projectId: string; // Nueva prop necesaria para VMCard
 }
 
 export const VMList: React.FC<VMListProps> = ({ vms, onStartVM, onStopVM, onConnectVM, onCopyToClipboard, projectId }) => {
@@ -29,9 +29,9 @@ export const VMList: React.FC<VMListProps> = ({ vms, onStartVM, onStopVM, onConn
             vm={vm} 
             onStart={() => onStartVM(vm.id)}
             onStop={() => onStopVM(vm.id)}
-            onConnect={onConnectVM} // onConnect ya recibe la VM
+            onConnect={onConnectVM} 
             onCopyToClipboard={onCopyToClipboard}
-            projectId={projectId} // ¡PASAR LA PROP A VMCard!
+            projectId={projectId} // Pasar la prop projectId
         />
       ))}
     </div>
