@@ -20,25 +20,25 @@ const ALLOWED_DOMAIN = 'gemigeo.com';
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
 
-  if (token == null) {
-    return res.status(401).json({ message: 'Acceso denegado. No se proporcionó token de autenticación.' });
-  }
+  if (token == null) {
+    return res.status(401).json({ message: 'Acceso denegado. No se proporcionó token de autenticación.' });
+  }
 
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) {
-      console.error("Error al verificar el token JWT de sesión:", err);
-      return res.status(403).json({ message: 'Token de autenticación inválido o expirado.' });
-    }
-    req.user = user;
-    next();
-  });
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      console.error("Error al verificar el token JWT de sesión:", err);
+      return res.status(403).json({ message: 'Token de autenticación inválido o expirado.' });
+    }
+    req.user = user;
+    next();
+  });
 };
 
 app.use(cors({
-  origin: [
+  origin: [
     'http://localhost:5173',
     'https://gcp-vm-dashboard-frontend-service-780691668337.europe-southwest1.run.app'
   ]
@@ -46,12 +46,13 @@ app.use(cors({
 app.use(express.json());
 
 app.get('/', (req, res) => {
-  res.status(200).send('OK');
+  res.status(200).send('OK');
 });
 
 let instancesClient;
 let zonesClient;
 let globalOperationsClient;
+let imagesClient; // Añadir cliente de imágenes para inspeccionar discos
 
 const GCP_PROJECT_ID = process.env.GCP_PROJECT_ID; 
 
@@ -61,40 +62,54 @@ if (!GCP_PROJECT_ID) {
 }
 
 try {
-  if (computePackage.v1 && computePackage.v1.InstancesClient && typeof computePackage.v1.InstancesClient === 'function') {
-    instancesClient = new computePackage.v1.InstancesClient({ projectId: GCP_PROJECT_ID });
-    console.log("Cliente de Instancias (para start/stop/list) inicializado con: new v1.InstancesClient()");
-  } else {
-    throw new Error("No se encontró el constructor InstancesClient en computePackage.v1.");
-  }
+  if (computePackage.v1 && computePackage.v1.InstancesClient && typeof computePackage.v1.InstancesClient === 'function') {
+    instancesClient = new computePackage.v1.InstancesClient({ projectId: GCP_PROJECT_ID });
+    console.log("Cliente de Instancias (para start/stop/list) inicializado con: new v1.InstancesClient()");
+  } else {
+    throw new Error("No se encontró el constructor InstancesClient en computePackage.v1.");
+  }
 } catch (e) {
-  console.error("Error fatal al inicializar Cliente de Instancias (para start/stop/list):", e.message);
-  process.exit(1);
+  console.error("Error fatal al inicializar Cliente de Instancias (para start/stop/list):", e.message);
+  process.exit(1);
 }
 
 try {
-  if (computePackage.v1 && computePackage.v1.ZonesClient && typeof computePackage.v1.ZonesClient === 'function') {
-    zonesClient = new computePackage.v1.ZonesClient({ projectId: GCP_PROJECT_ID });
-    console.log("Cliente de Zonas inicializado con: new v1.ZonesClient()");
-  } else {
-    throw new Error("No se encontró el constructor ZonesClient en computePackage.v1.");
-  }
+  if (computePackage.v1 && computePackage.v1.ZonesClient && typeof computePackage.v1.ZonesClient === 'function') {
+    zonesClient = new computePackage.v1.ZonesClient({ projectId: GCP_PROJECT_ID });
+    console.log("Cliente de Zonas inicializado con: new v1.ZonesClient()");
+  } else {
+    throw new Error("No se encontró el constructor ZonesClient en computePackage.v1.");
+  }
 } catch (e) {
-  console.error("Error fatal al inicializar Cliente de Zonas:", e.message);
-  process.exit(1);
+  console.error("Error fatal al inicializar Cliente de Zonas:", e.message);
+  process.exit(1);
 }
 
 try {
-  if (computePackage.v1 && computePackage.v1.GlobalOperationsClient && typeof computePackage.v1.GlobalOperationsClient === 'function') {
-    globalOperationsClient = new computePackage.v1.GlobalOperationsClient({ projectId: GCP_PROJECT_ID });
-    console.log("Cliente de Operaciones Globales inicializado con: new v1.GlobalOperationsClient()");
-  } else {
-    throw new Error("No se encontró el constructor GlobalOperationsClient en computePackage.v1.");
-  }
+  if (computePackage.v1 && computePackage.v1.GlobalOperationsClient && typeof computePackage.v1.GlobalOperationsClient === 'function') {
+    globalOperationsClient = new computePackage.v1.GlobalOperationsClient({ projectId: GCP_PROJECT_ID });
+    console.log("Cliente de Operaciones Globales inicializado con: new v1.GlobalOperationsClient()");
+  } else {
+    throw new Error("No se encontró el constructor GlobalOperationsClient en computePackage.v1.");
+  }
 } catch (e) {
-  console.error("Error fatal al inicializar Cliente de Operaciones Globales:", e.message);
-  process.exit(1);
+  console.error("Error fatal al inicializar Cliente de Operaciones Globales:", e.message);
+  process.exit(1);
 }
+
+// Inicializar ImagesClient
+try {
+  if (computePackage.v1 && computePackage.v1.ImagesClient && typeof computePackage.v1.ImagesClient === 'function') {
+    imagesClient = new computePackage.v1.ImagesClient({ projectId: GCP_PROJECT_ID });
+    console.log("Cliente de Imágenes inicializado con: new v1.ImagesClient()");
+  } else {
+    throw new Error("No se encontró el constructor ImagesClient en computePackage.v1.");
+  }
+} catch (e) {
+  console.error("Error fatal al inicializar Cliente de Imágenes:", e.message);
+  process.exit(1);
+}
+
 
 console.log("\n--- Estado de los clientes de Compute después de la inicialización ---");
 console.log("instancesClient:", instancesClient ? 'Inicializado' : 'ERROR');
@@ -105,232 +120,296 @@ console.log("zonesClient:", zonesClient ? 'Inicializado' : 'ERROR');
 console.log("zonesClient.list (si existe):", typeof zonesClient.list === 'function' ? 'Function' : 'Undefined/Not a function');
 console.log("globalOperationsClient:", globalOperationsClient ? 'Inicializado' : 'ERROR');
 console.log("globalOperationsClient.wait (si existe):", typeof globalOperationsClient.wait === 'function' ? 'Function' : 'Undefined/Not a function');
+console.log("imagesClient:", imagesClient ? 'Inicializado' : 'ERROR');
+console.log("imagesClient.get (si existe):", typeof imagesClient.get === 'function' ? 'Function' : 'Undefined/Not a function');
 console.log("----------------------------------------------------------\n");
 
+/**
+ * Intenta determinar el tipo de sistema operativo de una VM basada en su disco de arranque.
+ * @param {object} vm - Objeto VM de la API de GCP.
+ * @returns {Promise<string>} 'Windows', 'Linux', o 'Unknown'.
+ */
+async function getVmOsType(vm) {
+  if (!imagesClient || typeof imagesClient.get !== 'function') {
+    console.warn("Advertencia: imagesClient no está inicializado. No se puede determinar el tipo de SO.");
+    return 'Unknown';
+  }
+
+  // Verificar si hay discos y si el primero es un disco de arranque
+  if (vm.disks && vm.disks.length > 0 && vm.disks[0].boot) {
+    const bootDisk = vm.disks[0];
+    // La fuente de la imagen es una URL, necesitamos extraer el nombre de la imagen
+    const sourceImageLink = bootDisk.initializeParams?.sourceImage;
+
+    if (sourceImageLink) {
+      try {
+        // La URL de la imagen puede ser global, de proyecto o de una familia de imágenes.
+        // Ej: https://www.googleapis.com/compute/v1/projects/debian-cloud/global/images/debian-11-bullseye-v20240312
+        // Ej: https://www.googleapis.com/compute/v1/projects/windows-cloud/global/images/windows-server-2019-dc-v20240315
+
+        // Intentar extraer el nombre de la imagen de la URL
+        const imagePathParts = sourceImageLink.split('/');
+        const imageName = imagePathParts[imagePathParts.length - 1];
+
+        // Inferir el SO basado en el nombre de la imagen
+        if (imageName.toLowerCase().includes('windows')) {
+          return 'Windows';
+        } else if (imageName.toLowerCase().includes('debian') ||
+                   imageName.toLowerCase().includes('ubuntu') ||
+                   imageName.toLowerCase().includes('centos') ||
+                   imageName.toLowerCase().includes('rhel') ||
+                   imageName.toLowerCase().includes('sles') ||
+                   imageName.toLowerCase().includes('coreos') ||
+                   imageName.toLowerCase().includes('linux')) {
+          return 'Linux';
+        }
+      } catch (imageError) {
+        console.warn(`Error al intentar determinar el SO para VM ${vm.name} desde la imagen:`, imageError.message);
+      }
+    }
+  }
+  // Si no se pudo determinar por el disco, podrías intentar con etiquetas si las usas de forma consistente.
+  // Por ahora, si no se encuentra, devuelve 'Unknown'.
+  return 'Unknown';
+}
+
+
 app.post('/api/auth/google', async (req, res) => {
-  const { id_token } = req.body;
+  const { id_token } = req.body;
 
-  if (!id_token) {
-    return res.status(400).json({ message: 'Falta el ID Token.' });
-  }
+  if (!id_token) {
+    return res.status(400).json({ message: 'Falta el ID Token.' });
+  }
 
-  try {
-    const ticket = await client.verifyIdToken({
-      idToken: id_token,
-      audience: GOOGLE_CLIENT_ID,
-    });
-    const payload = ticket.getPayload();
+  try {
+    const ticket = await client.verifyIdToken({
+      idToken: id_token,
+      audience: GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
 
-    if (!payload || !payload.email || !payload.hd) {
-      console.warn("Payload incompleto o sin email/dominio en token de Google:", payload);
-      return res.status(401).json({ message: 'Token de Google inválido o incompleto.' });
-    }
+    if (!payload || !payload.email || !payload.hd) {
+      console.warn("Payload incompleto o sin email/dominio en token de Google:", payload);
+      return res.status(401).json({ message: 'Token de Google inválido o incompleto.' });
+    }
 
-    if (payload.hd !== ALLOWED_DOMAIN) {
-      console.warn(`Intento de inicio de sesión de dominio no permitido: ${payload.email}`);
-      return res.status(403).json({ message: `Acceso denegado. Solo se permiten cuentas de ${ALLOWED_DOMAIN}.` });
-    }
+    if (payload.hd !== ALLOWED_DOMAIN) {
+      console.warn(`Intento de inicio de sesión de dominio no permitido: ${payload.email}`);
+      return res.status(403).json({ message: `Acceso denegado. Solo se permiten cuentas de ${ALLOWED_DOMAIN}.` });
+    }
 
-    const user = {
-      id: payload.sub,
-      email: payload.email,
-      name: payload.name,
-      domain: payload.hd,
-    };
-    const appToken = jwt.sign(user, JWT_SECRET, { expiresIn: '1h' });
+    const user = {
+      id: payload.sub,
+      email: payload.email,
+      name: payload.name,
+      domain: payload.hd,
+    };
+    const appToken = jwt.sign(user, JWT_SECRET, { expiresIn: '1h' });
 
-    console.log(`Usuario autenticado y autorizado: ${user.email}`);
-    res.json({ token: appToken, user: { email: user.email, name: user.name } });
+    console.log(`Usuario autenticado y autorizado: ${user.email}`);
+    res.json({ token: appToken, user: { email: user.email, name: user.name } });
 
-  } catch (error) {
-    console.error("Error al verificar el ID Token de Google:", error.message);
-    res.status(401).json({ message: 'Fallo en la autenticación con Google.', error: error.message });
-  }
+  } catch (error) {
+    console.error("Error al verificar el ID Token de Google:", error.message);
+    res.status(401).json({ message: 'Fallo en la autenticación con Google.', error: error.message });
+  }
 });
 
 app.get('/api/vms/:projectId', authenticateToken, async (req, res) => {
-  const { projectId } = req.params;
-  console.log(`[BACKEND] Recibida solicitud GET para VMs en el proyecto: ${projectId} (por ${req.user.email})`);
-  try {
-    let vms = [];
+  const { projectId } = req.params;
+  console.log(`[BACKEND] Recibida solicitud GET para VMs en el proyecto: ${projectId} (por ${req.user.email})`);
+  try {
+    let vms = [];
 
-    if (!zonesClient || typeof zonesClient.list !== 'function') {
-      throw new Error("Cliente de Zonas no inicializado o no tiene el método 'list'.");
-    }
-    console.log(`[BACKEND] Intentando listar zonas para el proyecto: ${projectId}`);
-    const [zonesResponse] = await zonesClient.list({ project: projectId });
+    if (!zonesClient || typeof zonesClient.list !== 'function') {
+      throw new Error("Cliente de Zonas no inicializado o no tiene el método 'list'.");
+    }
+    console.log(`[BACKEND] Intentando listar zonas para el proyecto: ${projectId}`);
+    const [zonesResponse] = await zonesClient.list({ project: projectId });
 
-    const europeanZones = zonesResponse.filter(zone => zone.name.startsWith('europe-'));
-    const zones = europeanZones.map(zone => zone.name);
+    const europeanZones = zonesResponse.filter(zone => zone.name.startsWith('europe-'));
+    const zones = europeanZones.map(zone => zone.name);
 
-    console.log(`[BACKEND] Zonas EUROPEAS encontradas para el proyecto ${projectId}: ${zones.join(', ')}`);
+    console.log(`[BACKEND] Zonas EUROPEAS encontradas para el proyecto ${projectId}: ${zones.join(', ')}`);
 
-    if (!instancesClient || typeof instancesClient.list !== 'function') {
-      throw new Error("Cliente de Instancias no inicializado o no tiene el método 'list'.");
-    }
-    for (const zoneName of zones) {
-      console.log(`[BACKEND] Listando VMs en la zona: ${zoneName}`);
-      const [zoneVms] = await instancesClient.list({ project: projectId, zone: zoneName });
-      if (zoneVms && zoneVms.length > 0) {
-        vms.push(...zoneVms);
-      }
-    }
+    if (!instancesClient || typeof instancesClient.list !== 'function') {
+      throw new Error("Cliente de Instancias no inicializado o no tiene el método 'list'.");
+    }
+    for (const zoneName of zones) {
+      console.log(`[BACKEND] Listando VMs en la zona: ${zoneName}`);
+      const [zoneVms] = await instancesClient.list({ project: projectId, zone: zoneName });
+      if (zoneVms && zoneVms.length > 0) {
+        vms.push(...zoneVms);
+      }
+    }
 
-    console.log(`[BACKEND] Se encontraron ${vms.length} VMs en las zonas europeas de GCP.`);
+    console.log(`[BACKEND] Se encontraron ${vms.length} VMs en las zonas europeas de GCP.`);
 
-    const mappedVms = vms.map((vm) => ({
-      id: vm.id,
-      name: vm.name,
-      status: vm.status === 'CORRER' ? 'RUNNING' : (vm.status === 'PARADA' ? 'STOPPED' : vm.status),
-      zone: vm.zone.split('/').pop(),
-      region: vm.zone.split('/')[4].split('-').slice(0, 2).join('-'),
-      externalIp: vm.networkInterfaces && vm.networkInterfaces[0]?.accessConfigs?.[0]?.natIP || undefined,
-      internalIp: vm.networkInterfaces && vm.networkInterfaces[0]?.networkIP || undefined,
-      machineType: vm.machineType.split('/').pop(),
-      creationTimestamp: vm.creationTimestamp,
-    }));
+    const mappedVms = await Promise.all(vms.map(async (vm) => { // Usar Promise.all para esperar las llamadas asíncronas
+      const osType = await getVmOsType(vm); // Obtener el tipo de SO
+      return {
+        id: vm.id,
+        name: vm.name,
+        status: vm.status === 'CORRER' ? 'RUNNING' : (vm.status === 'PARADA' ? 'STOPPED' : vm.status),
+        zone: vm.zone.split('/').pop(),
+        region: vm.zone.split('/')[4].split('-').slice(0, 2).join('-'),
+        externalIp: vm.networkInterfaces && vm.networkInterfaces[0]?.accessConfigs?.[0]?.natIP || undefined,
+        internalIp: vm.networkInterfaces && vm.networkInterfaces[0]?.networkIP || undefined,
+        machineType: vm.machineType.split('/').pop(),
+        creationTimestamp: vm.creationTimestamp,
+        osType: osType // Añadir el tipo de SO
+      };
+    }));
 
-    console.log("[BACKEND] VMs mapeadas, enviando respuesta al frontend...");
-    res.json(mappedVms);
-  } catch (error) {
-    console.error('[BACKEND] Error en la ruta /api/vms:', error.message);
-    res.status(500).json({ message: 'Failed to fetch VMs from Google Cloud.', error: error.message, stack: error.stack });
-  }
+    console.log("[BACKEND] VMs mapeadas, enviando respuesta al frontend...");
+    res.json(mappedVms);
+  } catch (error) {
+    console.error('[BACKEND] Error en la ruta /api/vms:', error.message);
+    res.status(500).json({ message: 'Failed to fetch VMs from Google Cloud.', error: error.message, stack: error.stack });
+  }
 });
 
 app.post('/api/vms/start/:vmId', authenticateToken, async (req, res) => {
-  const { vmId } = req.params;
-  const { zone, projectId } = req.body;
-  console.log(`[BACKEND] Recibida solicitud POST para iniciar VM: ${vmId} en zona: ${zone}, proyecto: ${projectId} (por ${req.user.email})`);
-  try {
-    if (!instancesClient || typeof instancesClient.start !== 'function') {
-      throw new Error("Cliente de Instances no inicializado o no tiene el método 'start'.");
-    }
+  const { vmId } = req.params;
+  const { zone, projectId } = req.body;
+  console.log(`[BACKEND] Recibida solicitud POST para iniciar VM: ${vmId} en zona: ${zone}, proyecto: ${projectId} (por ${req.user.email})`);
+  try {
+    if (!instancesClient || typeof instancesClient.start !== 'function') {
+      throw new Error("Cliente de Instances no inicializado o no tiene el método 'start'.");
+    }
 
-    const [, operation] = await instancesClient.start({
-      project: projectId,
-      zone: zone,
-      instance: vmId,
-    });
+    const [, operation] = await instancesClient.start({
+      project: projectId,
+      zone: zone,
+      instance: vmId,
+    });
 
-    if (!globalOperationsClient || typeof globalOperationsClient.wait !== 'function') {
-      console.warn(`[BACKEND] GlobalOperationsClient no inicializado o no tiene el método 'wait()' para VM ${vmId}. El estado puede tardar en actualizarse.`);
-    } else {
-        try {
-            const zoneNameForWait = zone; 
-            await globalOperationsClient.wait({
-                project: projectId,
-                zone: zoneNameForWait,
-                operation: operation.name,
-            });
-            console.log(`[BACKEND] Operación de inicio para VM ${vmId} completada usando GlobalOperationsClient.wait().`);
-        } catch (waitError) {
-            console.error(`[BACKEND] Error al esperar la operación de VM ${vmId}:`, waitError.message);
-        }
-    }
+    if (!globalOperationsClient || typeof globalOperationsClient.wait !== 'function') {
+      console.warn(`[BACKEND] GlobalOperationsClient no inicializado o no tiene el método 'wait()' para VM ${vmId}. El estado puede tardar en actualizarse.`);
+    } else {
+        try {
+            const zoneNameForWait = zone; 
+            await globalOperationsClient.wait({
+                project: projectId,
+                zone: zoneNameForWait,
+                operation: operation.name,
+            });
+            console.log(`[BACKEND] Operación de inicio para VM ${vmId} completada usando GlobalOperationsClient.wait().`);
+        } catch (waitError) {
+            console.error(`[BACKEND] Error al esperar la operación de VM ${vmId}:`, waitError.message);
+        }
+    }
 
-    const [updatedVm] = await instancesClient.get({
-      project: projectId,
-      zone: zone,
-      instance: vmId,
-    });
+    const [updatedVm] = await instancesClient.get({
+      project: projectId,
+      zone: zone,
+      instance: vmId,
+    });
 
-    const actualStatusFromGCP = updatedVm.status;
-    let statusToReturn = actualStatusFromGCP;
+    const actualStatusFromGCP = updatedVm.status;
+    let statusToReturn = actualStatusFromGCP;
 
-    if (actualStatusFromGCP === 'STAGING' || actualStatusFromGCP === 'PROVISIONING' || actualStatusFromGCP === 'RUNNING' || actualStatusFromGCP === 'STOPPED' || actualStatusFromGCP === 'PARADA') {
-        statusToReturn = 'RUNNING';
-    } else if (actualStatusFromGCP === 'CORRER') {
-        statusToReturn = 'RUNNING';
-    }
+    if (actualStatusFromGCP === 'STAGING' || actualStatusFromGCP === 'PROVISIONING' || actualStatusFromGCP === 'RUNNING' || actualStatusFromGCP === 'STOPPED' || actualStatusFromGCP === 'PARADA') {
+        statusToReturn = 'RUNNING';
+    } else if (actualStatusFromGCP === 'CORRER') {
+        statusToReturn = 'RUNNING';
+    }
 
-    console.log(`[BACKEND] VM ${vmId} iniciada. Estado actualizado (antes de mapear): ${actualStatusFromGCP}. Estado final devuelto: ${statusToReturn}`);
+    // Obtener el tipo de SO para la VM actualizada
+    const osType = await getVmOsType(updatedVm);
 
-    const mappedVm = {
-      id: updatedVm.id,
-      name: updatedVm.name,
-      status: statusToReturn,
-      zone: updatedVm.zone ? updatedVm.zone.split('/').pop() : 'N/A',
-      region: updatedVm.zone ? updatedVm.zone.split('/')[4].split('-').slice(0, 2).join('-') : 'N/A',
-      externalIp: updatedVm.networkInterfaces && updatedVm.networkInterfaces[0]?.accessConfigs?.[0]?.natIP || undefined,
-      internalIp: updatedVm.networkInterfaces && updatedVm.networkInterfaces[0]?.networkIP || undefined,
-      machineType: updatedVm.machineType ? updatedVm.machineType.split('/').pop() : 'N/A',
-      creationTimestamp: updatedVm.creationTimestamp,
-    };
-    res.json(mappedVm);
-  } catch (error) {
-    console.error('Error starting VM:', error.message);
-    res.status(500).json({ message: 'Failed to start VM on Google Cloud.', error: error.message, stack: error.stack });
-  }
+    console.log(`[BACKEND] VM ${vmId} iniciada. Estado actualizado (antes de mapear): ${actualStatusFromGCP}. Estado final devuelto: ${statusToReturn}. SO: ${osType}`);
+
+    const mappedVm = {
+      id: updatedVm.id,
+      name: updatedVm.name,
+      status: statusToReturn,
+      zone: updatedVm.zone ? updatedVm.zone.split('/').pop() : 'N/A',
+      region: updatedVm.zone ? updatedVm.zone.split('/')[4].split('-').slice(0, 2).join('-') : 'N/A',
+      externalIp: updatedVm.networkInterfaces && updatedVm.networkInterfaces[0]?.accessConfigs?.[0]?.natIP || undefined,
+      internalIp: updatedVm.networkInterfaces && updatedVm.networkInterfaces[0]?.networkIP || undefined,
+      machineType: updatedVm.machineType ? updatedVm.machineType.split('/').pop() : 'N/A',
+      creationTimestamp: updatedVm.creationTimestamp,
+      osType: osType // Añadir el tipo de SO
+    };
+    res.json(mappedVm);
+  } catch (error) {
+    console.error('Error starting VM:', error.message);
+    res.status(500).json({ message: 'Failed to start VM on Google Cloud.', error: error.message, stack: error.stack });
+  }
 });
 
 app.post('/api/vms/stop/:vmId', authenticateToken, async (req, res) => {
-  const { vmId } = req.params;
-  const { zone, projectId } = req.body;
-  console.log(`[BACKEND] Recibida solicitud POST para detener VM: ${vmId} en zona: ${zone}, proyecto: ${projectId} (por ${req.user.email})`);
-  try {
-    if (!instancesClient || typeof instancesClient.stop !== 'function') {
-      throw new Error("Cliente de Instances no inicializado o no tiene el método 'stop'.");
-    }
-    const [, operation] = await instancesClient.stop({
-      project: projectId,
-      zone: zone,
-      instance: vmId,
-    });
+  const { vmId } = req.params;
+  const { zone, projectId } = req.body;
+  console.log(`[BACKEND] Recibida solicitud POST para detener VM: ${vmId} en zona: ${zone}, proyecto: ${projectId} (por ${req.user.email})`);
+  try {
+    if (!instancesClient || typeof instancesClient.stop !== 'function') {
+      throw new Error("Cliente de Instances no inicializado o no tiene el método 'stop'.");
+    }
+    const [, operation] = await instancesClient.stop({
+      project: projectId,
+      zone: zone,
+      instance: vmId,
+    });
 
-    if (!globalOperationsClient || typeof globalOperationsClient.wait !== 'function') {
-      console.warn(`[BACKEND] GlobalOperationsClient no inicializado o no tiene el método 'wait()' para VM ${vmId}. El estado puede tardar en actualizarse.`);
-    } else {
-        try {
-            const zoneNameForWait = zone;
-            await globalOperationsClient.wait({
-                project: projectId,
-                zone: zoneNameForWait,
-                operation: operation.name,
-            });
-            console.log(`[BACKEND] Operación de detención para VM ${vmId} completada usando GlobalOperationsClient.wait().`);
-        } catch (waitError) {
-            console.error(`[BACKEND] Error al esperar la operación de detención de VM ${vmId}:`, waitError.message);
-        }
-    }
+    if (!globalOperationsClient || typeof globalOperationsClient.wait !== 'function') {
+      console.warn(`[BACKEND] GlobalOperationsClient no inicializado o no tiene el método 'wait()' para VM ${vmId}. El estado puede tardar en actualizarse.`);
+    } else {
+        try {
+            const zoneNameForWait = zone;
+            await globalOperationsClient.wait({
+                project: projectId,
+                zone: zoneNameForWait,
+                operation: operation.name,
+            });
+            console.log(`[BACKEND] Operación de detención para VM ${vmId} completada usando GlobalOperationsClient.wait().`);
+        } catch (waitError) {
+            console.error(`[BACKEND] Error al esperar la operación de detención de VM ${vmId}:`, waitError.message);
+        }
+    }
 
-    const [updatedVm] = await instancesClient.get({
-      project: projectId,
-      zone: zone,
-      instance: vmId,
-    });
+    const [updatedVm] = await instancesClient.get({
+      project: projectId,
+      zone: zone,
+      instance: vmId,
+    });
 
-    const actualStatusFromGCP = updatedVm.status;
-    let statusToReturn = actualStatusFromGCP;
+    const actualStatusFromGCP = updatedVm.status;
+    let statusToReturn = actualStatusFromGCP;
 
-    if (actualStatusFromGCP === 'STOPPED' || actualStatusFromGCP === 'TERMINATED' || actualStatusFromGCP === 'SUSPENDING' || actualStatusFromGCP === 'PARADA') {
-        statusToReturn = 'STOPPED';
-    } else if (actualStatusFromGCP === 'PROVISIONING' || actualStatusFromGCP === 'STAGING' || actualStatusFromGCP === 'RUNNING' || actualStatusFromGCP === 'CORRER') {
-        if (actualStatusFromGCP === 'CORRER') {
-            statusToReturn = 'RUNNING';
-        }
-    }
+    if (actualStatusFromGCP === 'STOPPED' || actualStatusFromGCP === 'TERMINATED' || actualStatusFromGCP === 'SUSPENDING' || actualStatusFromGCP === 'PARADA') {
+        statusToReturn = 'STOPPED';
+    } else if (actualStatusFromGCP === 'PROVISIONING' || actualStatusFromGCP === 'STAGING' || actualStatusFromGCP === 'RUNNING' || actualStatusFromGCP === 'CORRER') {
+        if (actualStatusFromGCP === 'CORRER') {
+            statusToReturn = 'RUNNING';
+        }
+    }
 
-    console.log(`[BACKEND] VM ${vmId} detenida. Estado actualizado (antes de mapear): ${actualStatusFromGCP}. Estado final devuelto: ${statusToReturn}`);
+    // Obtener el tipo de SO para la VM actualizada
+    const osType = await getVmOsType(updatedVm);
 
-    const mappedVm = {
-      id: updatedVm.id,
-      name: updatedVm.name,
-      status: statusToReturn,
-      zone: updatedVm.zone ? updatedVm.zone.split('/').pop() : 'N/A',
-      region: updatedVm.zone ? updatedVm.zone.split('/')[4].split('-').slice(0, 2).join('-') : 'N/A',
-      externalIp: updatedVm.networkInterfaces && updatedVm.networkInterfaces[0]?.accessConfigs?.[0]?.natIP || undefined,
-      internalIp: updatedVm.networkInterfaces && updatedVm.networkInterfaces[0]?.networkIP || undefined,
-      machineType: updatedVm.machineType ? updatedVm.machineType.split('/').pop() : 'N/A',
-      creationTimestamp: updatedVm.creationTimestamp,
-    };
-    res.json(mappedVm);
-  } catch (error) {
-    console.error('Error stopping VM:', error.message);
-    res.status(500).json({ message: 'Failed to stop VM on Google Cloud.', error: error.message, stack: error.stack });
-  }
+    console.log(`[BACKEND] VM ${vmId} detenida. Estado actualizado (antes de mapear): ${actualStatusFromGCP}. Estado final devuelto: ${statusToReturn}. SO: ${osType}`);
+
+    const mappedVm = {
+      id: updatedVm.id,
+      name: updatedVm.name,
+      status: statusToReturn,
+      zone: updatedVm.zone ? updatedVm.zone.split('/').pop() : 'N/A',
+      region: updatedVm.zone ? updatedVm.zone.split('/')[4].split('-').slice(0, 2).join('-') : 'N/A',
+      externalIp: updatedVm.networkInterfaces && updatedVm.networkInterfaces[0]?.accessConfigs?.[0]?.natIP || undefined,
+      internalIp: updatedVm.networkInterfaces && updatedVm.networkInterfaces[0]?.networkIP || undefined,
+      machineType: updatedVm.machineType ? updatedVm.machineType.split('/').pop() : 'N/A',
+      creationTimestamp: updatedVm.creationTimestamp,
+      osType: osType // Añadir el tipo de SO
+    };
+    res.json(mappedVm);
+  } catch (error) {
+    console.error('Error stopping VM:', error.message);
+    res.status(500).json({ message: 'Failed to stop VM on Google Cloud.', error: error.message, stack: error.stack });
+  }
 });
 
 app.listen(port, () => {
-  console.log(`Backend server listening at http://localhost:${port}`);
+  console.log(`Backend server listening at http://localhost:${port}`);
 });
