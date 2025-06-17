@@ -365,19 +365,19 @@ const App: React.FC = () => {
             </div>
           )}
 
-                    {!isLoading && !error && filteredVMs.length > 0 && (
+          {!isLoading && !error && filteredVMs.length > 0 && (
             <VMList
               vms={filteredVMs}
               onStartVM={handleStartVM}
               onStopVM={handleStopVM}
-              onConnectVM={handleConnectVM}
+              onConnectVM={handleConnectVM} // Esto abrirá el ConnectModal (ahora el modal unificado)
               onCopyToClipboard={handleCopyToClipboard}
-              // --- ¡NUEVA PROP! ---
               projectId={selectedProject.id} // Pasar el projectId a VMList
             />
           )}
         </div>
       </main>
+      {/* El ConnectModal se abre aquí. selectedVMForConnect lo controla. */}
       {selectedVMForConnect && (
         <ConnectModal
           vm={selectedVMForConnect}
