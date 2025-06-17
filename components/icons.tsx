@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 interface IconProps {
@@ -99,6 +98,12 @@ export const UserCircleIcon: React.FC<IconProps> = ({ className }) => (
 export const ChevronDownIcon: React.FC<IconProps> = ({ className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+  </svg>
+);
+
+export const TerminalIcon: React.FC<IconProps> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 20V4m0 16-3.5-3.5M6 20l3.5-3.5m9.5-11h-9.5m9.5 0L19 7.5m0 0L22 4m-3 3.5h3.5" />
   </svg>
 );
 
