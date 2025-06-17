@@ -365,28 +365,30 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {!isLoading && !error && filteredVMs.length > 0 && (
-            <VMList
-              vms={filteredVMs}
-              onStartVM={handleStartVM}
-              onStopVM={handleStopVM}
-              onConnectVM={handleConnectVM}
-              onCopyToClipboard={handleCopyToClipboard}
-            />
-          )}
-        </div>
-      </main>
-      {selectedVMForConnect && (
-        <ConnectModal
-          vm={selectedVMForConnect}
-          onClose={() => setSelectedVMForConnect(null)}
-          onCopyToClipboard={handleCopyToClipboard}
-          projectId={selectedProject.id}
-        />
-      )}
-      {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage(null)} />}
-    </div>
-  );
+                    {!isLoading && !error && filteredVMs.length > 0 && (
+            <VMList
+              vms={filteredVMs}
+              onStartVM={handleStartVM}
+              onStopVM={handleStopVM}
+              onConnectVM={handleConnectVM}
+              onCopyToClipboard={handleCopyToClipboard}
+              // --- ¡NUEVA PROP! ---
+              projectId={selectedProject.id} // Pasar el projectId a VMList
+            />
+          )}
+        </div>
+      </main>
+      {selectedVMForConnect && (
+        <ConnectModal
+          vm={selectedVMForConnect}
+          onClose={() => setSelectedVMForConnect(null)}
+          onCopyToClipboard={handleCopyToClipboard}
+          projectId={selectedProject.id}
+        />
+      )}
+      {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage(null)} />}
+    </div>
+  );
 };
 
 export default App;

@@ -4,10 +4,11 @@ import { PowerIcon, StopIcon, LinkIcon, ChipIcon, LocationMarkerIcon, ClipboardC
 
 interface VMCardProps {
   vm: VirtualMachine;
-  onStart: () => void;
-  onStop: () => void;
-  onConnect: () => void;
+  onStart: (vmId: string) => void;
+  onStop: (vmId: string) => void;
+  onConnect: (vm: VirtualMachine) => void; // onConnect ahora espera la VM completa
   onCopyToClipboard: (text: string, type: string) => void;
+  projectId: string; // Asegúrate de que esta prop se sigue pasando desde App.tsx
 }
 
 const StatusIndicator: React.FC<{ status: VMStatus | string }> = ({ status }) => {
@@ -42,10 +43,20 @@ const StatusIndicator: React.FC<{ status: VMStatus | string }> = ({ status }) =>
       textColor = 'text-slate-700';
       ringColor = 'ring-slate-500';
       break;
-    case 'FINALIZADO': // Mapeo si la API devuelve exactamente "FINALIZADO"
+    case 'FINALIZADO': 
       bgColor = 'bg-gcp-red';
       textColor = 'text-red-700';
       ringColor = 'ring-red-400';
+      break;
+    case 'PARADA': 
+      bgColor = 'bg-gcp-red';
+      textColor = 'text-red-700';
+      ringColor = 'ring-red-400';
+      break;
+    case 'CORRER': 
+      bgColor = 'bg-gcp-green';
+      textColor = 'text-green-700';
+      ringColor = 'ring-gcp-green';
       break;
     default:
       bgColor = 'bg-gray-400';
@@ -66,33 +77,49 @@ const StatusIndicator: React.FC<{ status: VMStatus | string }> = ({ status }) =>
 };
 
 
-export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, onCopyToClipboard }) => {
-  // Ya no necesitamos isHovered
-  // const [isHovered, setIsHovered] = React.useState(false); 
+export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, onCopyToClipboard, projectId }) => { // projectId añadido a las props
+  // Ya no necesitamos showPopover ni isHovered
+  // const [showPopover, setShowPopover] = React.useState(false); 
+  // const popoverRef = React.useRef<HTMLDivElement>(null); 
 
-  const isActuallyStopped = vm.status === VMStatus.STOPPED || vm.status === 'FINALIZADO' || vm.status === 'TERMINATED';
-  const isActuallyRunning = vm.status === VMStatus.RUNNING;
+  const isActuallyStopped = vm.status === VMStatus.STOPPED || vm.status === 'FINALIZADO' || vm.status === 'TERMINATED' || vm.status === 'PARADA';
+  const isActuallyRunning = vm.status === VMStatus.RUNNING || vm.status === 'CORRER';
   const isStartingOrStopping = vm.status === 'PROVISIONING' || vm.status === 'SUSPENDING' || vm.status === 'STAGING';
 
-  // canStart y canStop determinan si el botón está HABILITADO
   const canStart = isActuallyStopped && !isStartingOrStopping;
   const canStop = isActuallyRunning && !isStartingOrStopping;
-  const canConnect = isActuallyRunning && !isStartingOrStopping;
+  const canConnect = isActuallyRunning && !isStartingOrStopping; // Habilitar el botón Conectar
 
   // Determinar la clase CSS del botón de acción (verde/rojo o gris)
   const getActionButtonClass = (isEnabled: boolean, baseColor: string) => 
-    `flex-1 inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${isEnabled ? `bg-${baseColor}-500 hover:bg-${baseColor}-600 focus:ring-${baseColor}-500` : 'bg-gray-300 text-gray-500 cursor-not-allowed'} focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50`;
+    `flex-1 inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${isEnabled ? `bg-${baseColor}-500 hover:bg-${baseColor}-600 focus:ring-${baseColor}-500` : 'bg-gray-300 text-gray-500 cursor-not-allowed'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-50 disabled:opacity-50`;
 
+  // Determinar el texto para el botón deshabilitado (estado de transición o final no accionable)
+  const getDisabledButtonText = () => {
+    if (isStartingOrStopping) {
+      if (vm.status === 'PROVISIONING') return 'Iniciando...';
+      if (vm.status === 'SUSPENDING') return 'Deteniendo...';
+      if (vm.status === 'STAGING') return 'Preparando...';
+      return 'Transición...';
+    }
+    if (vm.status === VMStatus.TERMINATED || vm.status === 'FINALIZADO') {
+      return 'Terminada';
+    }
+    if (vm.status === 'PARADA') {
+      return 'Parada';
+    }
+    return vm.status; 
+  };
 
   return (
     <div 
       className="bg-white shadow-lg rounded-xl overflow-hidden flex flex-col transition-all hover:shadow-xl"
-      // Eliminamos el onMouseEnter/onMouseLeave
-      // onMouseEnter={() => setIsHovered(true)} 
-      // onMouseLeave={() => setIsHovered(false)}
     >
       <div className="p-5 border-b border-gray-200">
-        <h3 className="text-xl font-bold text-gray-800 truncate" title={vm.name}>{vm.name}</h3>
+        <div className="flex justify-between items-center relative"> 
+          <h3 className="text-xl font-bold text-gray-800 truncate" title={vm.name}>{vm.name}</h3>
+          {/* Ya no hay botón de "más opciones" aquí, todo en el modal principal */}
+        </div>
         <div className="mt-1">
           <StatusIndicator status={vm.status} />
         </div>
@@ -110,8 +137,8 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
               <span>Ext. IP: {vm.externalIp}</span>
             </div>
             <button 
-              onClick={() => onCopyToClipboard(vm.externalIp!, 'External IP')} 
-              title="Copy External IP"
+              onClick={() => onCopyToClipboard(vm.externalIp!, 'IP Externa')} 
+              title="Copiar IP Externa"
               className="ml-2 p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-gray-700"
             >
               <ClipboardCopyIcon className="h-4 w-4" />
@@ -121,11 +148,11 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
         <div className="flex items-center justify-between">
             <div className="flex items-center">
                 <ChipIcon className="h-4 w-4 mr-2 text-gray-400" />
-                <span>Int. IP: {vm.internalIp}</span>
+                <span>IP Int: {vm.internalIp}</span>
             </div>
             <button 
-              onClick={() => onCopyToClipboard(vm.internalIp, 'Internal IP')} 
-              title="Copy Internal IP"
+              onClick={() => onCopyToClipboard(vm.internalIp, 'IP Interna')} 
+              title="Copiar IP Interna"
               className="ml-2 p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-gray-700"
             >
               <ClipboardCopyIcon className="h-4 w-4" />
@@ -133,12 +160,12 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
         </div>
         <div className="flex items-center">
           <CogIcon className="h-4 w-4 mr-2 text-gray-400" />
-          <span>Type: {vm.machineType}</span>
+          <span>Tipo: {vm.machineType}</span>
         </div>
       </div>
 
       <div className="p-4 bg-gray-50 border-t border-gray-200">
-        <div className="flex space-x-2"> {/* Los 3 botones principales siempre visibles */}
+        <div className="flex space-x-2"> {/* Fila principal de botones */}
           {/* Botón Encender */}
           <button
             onClick={onStart}
@@ -159,16 +186,28 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
             Apagar
           </button>
           
-          {/* Botón Conectar */}
+          {/* Botón Conectar (este botón ahora abre el modal unificado de conexión) */}
           <button
-            onClick={onConnect}
-            disabled={!canConnect}
+            onClick={() => onConnect(vm)} {/* Pasa la VM completa a onConnect */}
+            disabled={!canConnect} // Habilitado si canConnect es true
             className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gcp-blue disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <LinkIcon className="h-5 w-5 mr-1" />
             Conectar
           </button>
         </div>
+
+        {/* Si la VM está en transición o no es accionable, mostrar un botón de estado deshabilitado */}
+        { isStartingOrStopping || (!canStart && !canStop && !canConnect) ? ( // Si está en transición, O no puede ni encender, ni apagar, ni conectar
+            <div className="flex space-x-2 mt-2 w-full"> {/* Usamos w-full para que ocupe todo el ancho */}
+                <button
+                disabled
+                className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-500 bg-gray-200 cursor-not-allowed"
+                >
+                {getDisabledButtonText()}
+                </button>
+            </div>
+        ) : null}
       </div>
     </div>
   );
