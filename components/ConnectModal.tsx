@@ -1,7 +1,7 @@
 // src/components/ConnectModal.tsx
 import React from 'react';
 import { VirtualMachine } from '../types';
-import { ClipboardCopyIcon, XIcon, LinkIcon, TerminalIcon } from './icons'; 
+import { ClipboardCopyIcon, XIcon, LinkIcon, TerminalIcon, DownloadIcon } from './icons'; // Asegúrate de importar DownloadIcon
 
 interface ConnectModalProps {
   vm: VirtualMachine;
@@ -14,22 +14,80 @@ export const ConnectModal: React.FC<ConnectModalProps> = ({ vm, onClose, onCopyT
   // Comandos SSH/gcloud/RDP
   const sshCommand = vm.externalIp ? `ssh your_user@${vm.externalIp}` : 'N/A (No External IP)';
   const gcloudCommand = `gcloud compute ssh ${vm.name} --zone=${vm.zone} --project=${projectId}`;
-  // El comando RDP para usar en la terminal de Windows.
   const rdpCommand = vm.externalIp ? `mstsc /v:${vm.externalIp}` : 'N/A (No External IP)';
   
   // Enlaces directos a la consola de Google Cloud
   const gcpInstancesBaseUrl = `https://console.cloud.google.com/compute/instancesDetail/zones/${vm.zone}/instances/${vm.name}?project=${projectId}`;
-  // Este enlace lleva a la página de detalles de la VM, donde se puede "Establecer contraseña de Windows"
   const setWindowsPasswordLink = gcpInstancesBaseUrl; 
 
   // Enlace SSH en navegador (solo para Linux)
   const sshInBrowserLink = `https://ssh.cloud.google.com/v2/ssh/projects/${projectId}/zones/${vm.zone}/instances/${vm.name}`;
 
-  // Detección de VM Windows (usando la nueva propiedad osType)
-  // Asegúrate de que 'Windows' y 'Linux' coincidan exactamente con lo que envía tu backend.
+  // Detección de VM Windows (asumimos que el backend ya lo envía correctamente)
   const isWindowsVM = vm.osType === 'Windows'; 
   const isLinuxVM = vm.osType === 'Linux';
   const isUnknownOS = vm.osType === 'Unknown' || !vm.osType;
+
+  // NUEVA FUNCIÓN: Generar y descargar archivo .rdp
+  const handleDownloadRDP = () => {
+    if (!vm.externalIp) {
+      alert('La VM no tiene una IP externa para la conexión RDP.');
+      return;
+    }
+
+    // Puedes establecer un nombre de usuario por defecto si lo deseas, o dejarlo vacío
+    // Para VMs de GCP, "gcpuser" o "Administrador" son comunes.
+    const rdpUsername = 'gcpuser'; // O 'Administrator', o simplemente dejarlo vacío si quieres que el usuario lo introduzca.
+
+    const rdpContent = `
+full address:s:${vm.externalIp}
+username:s:${rdpUsername}
+audiomode:i:0
+videoplaybackmode:i:1
+connection type:i:2
+display a connection bar:i:1
+desktopwidth:i:0
+desktopheight:i:0
+session bpp:i:24
+compression:i:1
+keyboardhook:i:2
+audiocapturemode:i:0
+redirectprinters:i:1
+redirectcomports:i:0
+redirectsmartcards:i:1
+redirectclipboard:i:1
+autoreconnection enabled:i:1
+authentication level:i:3
+negotiate security layer:i:1
+remoteapplicationmode:i:0
+shell working directory:s:
+span monitors:i:0
+drives:s:
+gatewayhostname:s:
+gatewayusagemethod:i:0
+gatewaycredentialssource:i:0
+full address:s:${vm.externalIp}
+drdesktopenabled:i:0
+maximizedestop:i:0
+networkautodetect:i:1
+bandwidthautodetect:i:1
+displayconnectionbar:i:1
+enablerdsaad:i:0
+use multimon:i:0
+`; // Puedes añadir más parámetros RDP si los necesitas
+
+    const blob = new Blob([rdpContent], { type: 'application/x-rdp' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${vm.name}.rdp`; // Nombre del archivo RDP
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url); // Limpiar la URL del objeto
+    
+    onCopyToClipboard(rdpContent, 'Archivo RDP'); // Opcional: notificar que se descargó
+  };
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full flex items-center justify-center z-50 p-4">
@@ -76,7 +134,7 @@ export const ConnectModal: React.FC<ConnectModalProps> = ({ vm, onClose, onCopyT
 
             {isWindowsVM && ( // Opciones para Windows
               <div>
-                <p className="font-medium text-gray-700">Conexión RDP (Gestión de Credenciales):</p>
+                <p className="font-medium text-gray-700">Gestionar Credenciales de Windows:</p>
                 <div className="mt-1 flex items-center bg-gray-100 p-2 rounded-md">
                   <a 
                     href={setWindowsPasswordLink} 
@@ -85,7 +143,7 @@ export const ConnectModal: React.FC<ConnectModalProps> = ({ vm, onClose, onCopyT
                     className="text-gcp-blue hover:underline flex-grow truncate"
                     title="Establecer/Ver Contraseña de Windows y Opciones de RDP"
                   >
-                    Gestionar en Consola de Google Cloud
+                    Abrir en Consola de Google Cloud
                   </a>
                   <button
                     onClick={() => onCopyToClipboard(setWindowsPasswordLink, 'Enlace Consola Windows')}
@@ -96,10 +154,26 @@ export const ConnectModal: React.FC<ConnectModalProps> = ({ vm, onClose, onCopyT
                   </button>
                 </div>
                 <p className="mt-1 text-xs text-gray-700">
-                  **Paso 1:** Haz clic en el botón de arriba para ir a la página de detalles de la VM en la Consola de Google Cloud.<br/>
-                  **Paso 2:** En la consola, busca y haz clic en el botón **"Configurar contraseña de Windows"** para obtener o generar el usuario y la clave de acceso RDP.<br/>
-                  **Paso 3:** Una vez tengas las credenciales, puedes usar la opción **"Conectar (RDP)"** en la misma consola o el comando RDP de la derecha con tu cliente de escritorio remoto preferido.
+                  **Paso 1 (Crucial):** Haz clic en el botón de arriba para ir a la página de detalles de la VM en la Consola de Google Cloud.<br/>
+                  Allí, busca y haz clic en **"Configurar contraseña de Windows"** para obtener o generar el usuario y la clave de acceso RDP. **Necesitarás esta información.**
                 </p>
+                {vm.externalIp && ( // Mostrar la opción de descarga solo si hay IP externa
+                  <div className="mt-4">
+                    <p className="font-medium text-gray-700">Descargar archivo .RDP:</p>
+                    <button
+                      onClick={handleDownloadRDP}
+                      className="mt-1 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      disabled={!vm.externalIp} // Deshabilitar si no hay IP externa
+                      title={vm.externalIp ? "Descargar archivo .RDP para la conexión" : "VM sin IP externa para descarga RDP directa"}
+                    >
+                      <DownloadIcon className="h-5 w-5 mr-2" /> Descargar .RDP
+                    </button>
+                    <p className="mt-1 text-xs text-gray-500">
+                      **Paso 2:** Abre este archivo con tu cliente de Escritorio Remoto y usa las credenciales obtenidas en el Paso 1.
+                    </p>
+                  </div>
+                )}
+                {!vm.externalIp && <p className="mt-1 text-xs text-orange-500">VM sin IP externa. La descarga de .RDP no es posible directamente.</p>}
               </div>
             )}
 
