@@ -76,7 +76,7 @@ export const ConnectModal: React.FC<ConnectModalProps> = ({ vm, onClose, onCopyT
 
             {isWindowsVM && ( // Opciones para Windows
               <div>
-                <p className="font-medium text-gray-700">Gestionar Contraseña y RDP en Consola:</p>
+                <p className="font-medium text-gray-700">Conexión RDP (Gestión de Credenciales):</p>
                 <div className="mt-1 flex items-center bg-gray-100 p-2 rounded-md">
                   <a 
                     href={setWindowsPasswordLink} 
@@ -85,7 +85,7 @@ export const ConnectModal: React.FC<ConnectModalProps> = ({ vm, onClose, onCopyT
                     className="text-gcp-blue hover:underline flex-grow truncate"
                     title="Establecer/Ver Contraseña de Windows y Opciones de RDP"
                   >
-                    Abrir en Consola de Google Cloud
+                    Gestionar en Consola de Google Cloud
                   </a>
                   <button
                     onClick={() => onCopyToClipboard(setWindowsPasswordLink, 'Enlace Consola Windows')}
@@ -95,9 +95,10 @@ export const ConnectModal: React.FC<ConnectModalProps> = ({ vm, onClose, onCopyT
                     <ClipboardCopyIcon className="h-4 w-4" />
                   </button>
                 </div>
-                <p className="mt-1 text-xs text-gray-500">
-                  Necesitarás un usuario y contraseña para RDP. Consíguelos o establécelos aquí.
-                  La Consola también ofrece una opción de conexión directa con RDP.
+                <p className="mt-1 text-xs text-gray-700">
+                  **Paso 1:** Haz clic en el botón de arriba para ir a la página de detalles de la VM en la Consola de Google Cloud.<br/>
+                  **Paso 2:** En la consola, busca y haz clic en el botón **"Configurar contraseña de Windows"** para obtener o generar el usuario y la clave de acceso RDP.<br/>
+                  **Paso 3:** Una vez tengas las credenciales, puedes usar la opción **"Conectar (RDP)"** en la misma consola o el comando RDP de la derecha con tu cliente de escritorio remoto preferido.
                 </p>
               </div>
             )}
@@ -123,7 +124,7 @@ export const ConnectModal: React.FC<ConnectModalProps> = ({ vm, onClose, onCopyT
                     <ClipboardCopyIcon className="h-4 w-4" />
                   </button>
                 </div>
-                <p className="mt-1 text-xs text-yellow-600">No se pudo determinar el tipo de sistema operativo. Considera revisar la configuración de la VM o usar la Consola de GCP para la conexión.</p>
+                <p className="mt-1 text-xs text-orange-600 font-semibold">No se pudo determinar el tipo de sistema operativo. Considera revisar la configuración de la VM o usar la Consola de GCP para la conexión.</p>
               </div>
             )}
           </div>
@@ -147,7 +148,7 @@ export const ConnectModal: React.FC<ConnectModalProps> = ({ vm, onClose, onCopyT
                     </button>
                   </div>
                   <p className="mt-1 text-xs text-gray-500">Reemplaza <code>your_user</code> con tu usuario en la VM.</p>
-                  {!vm.externalIp && <p className="mt-1 text-xs text-yellow-600">VM sin IP externa.</p>}
+                  {!vm.externalIp && <p className="mt-1 text-xs text-orange-500">VM sin IP externa.</p>}
                 </div>
 
                 <div>
@@ -181,8 +182,11 @@ export const ConnectModal: React.FC<ConnectModalProps> = ({ vm, onClose, onCopyT
                       <ClipboardCopyIcon className="h-4 w-4" />
                     </button>
                   </div>
-                  <p className="mt-1 text-xs text-gray-500">Usa este comando en tu cliente de Escritorio Remoto (<code>mstsc</code> en Windows). Requiere usuario y contraseña.</p>
-                  {!vm.externalIp && <p className="mt-1 text-xs text-yellow-600">VM sin IP externa. RDP por IP externa no es posible directamente.</p>}
+                  <p className="mt-1 text-xs text-gray-500">
+                    Usa este comando en tu cliente de Escritorio Remoto (<code>mstsc</code> en Windows). 
+                    **Necesitarás el usuario y la contraseña generados en la Consola de Google Cloud.**
+                  </p>
+                  {!vm.externalIp && <p className="mt-1 text-xs text-orange-500">VM sin IP externa. RDP por IP externa no es posible directamente.</p>}
                 </div>
               </div>
             )}
@@ -202,7 +206,7 @@ export const ConnectModal: React.FC<ConnectModalProps> = ({ vm, onClose, onCopyT
                         <ClipboardCopyIcon className="h-4 w-4" />
                       </button>
                     </div>
-                    {!vm.externalIp && <p className="mt-1 text-xs text-yellow-600">VM sin IP externa.</p>}
+                    {!vm.externalIp && <p className="mt-1 text-xs text-orange-500">VM sin IP externa.</p>}
                   </div>
                    <div>
                     <p className="font-medium text-gray-700">Intento RDP (IP Externa):</p>
@@ -216,7 +220,7 @@ export const ConnectModal: React.FC<ConnectModalProps> = ({ vm, onClose, onCopyT
                         <ClipboardCopyIcon className="h-4 w-4" />
                       </button>
                     </div>
-                    {!vm.externalIp && <p className="mt-1 text-xs text-yellow-600">VM sin IP externa.</p>}
+                    {!vm.externalIp && <p className="mt-1 text-xs text-orange-500">VM sin IP externa.</p>}
                   </div>
               </div>
             )}
