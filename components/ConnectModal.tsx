@@ -139,10 +139,16 @@ use multimon:i:0
                   <DownloadIcon className="h-5 w-5 mr-2" /> Descargar .RDP
                 </button>
                 <p className="mt-2 text-xs text-blue-800 font-semibold bg-blue-50 p-2 rounded-md border border-blue-200">
-                  **Importante:** El **nombre de usuario y la contraseña** para acceder a esta máquina RDP serán facilitados por el **área de IT** de tu organización.
+                  Paso 1: Descargar el archivo .RDP
+                </p>
+                <p className="mt-2 text-xs text-blue-800 font-semibold bg-blue-50 p-2 rounded-md border border-blue-200">
+                  Paso 2: Ejecutar el archivo .RDP y la primera vez le pedirá el usuario y la contraseña, recuerda darle a recordar credenciales al entrar.
+                </p>
+                <p className="mt-2 text-xs text-blue-800 font-semibold bg-blue-50 p-2 rounded-md border border-blue-200">
+                  **Importante:** El nombre de usuario y la contraseña para acceder a esta máquina RDP serán facilitados por el Área de IT de tu organización.
                 </p>
                 <p className="mt-2 text-xs text-orange-800 font-semibold bg-orange-50 p-2 rounded-md border border-orange-200">
-                  **Recordatorio:** Por favor, asegúrate de **apagar la máquina virtual** cuando hayas terminado de usarla para evitar costes innecesarios.
+                  **Recordatorio:** Por favor, asegúrate de Apagar la máquina virtual cuando hayas terminado de usarla para evitar costes innecesarios.
                 </p>
                 {!vm.externalIp && <p className="mt-1 text-xs text-orange-500">VM sin IP externa. La descarga de .RDP no es posible directamente.</p>}
               </div>
@@ -173,67 +179,6 @@ use multimon:i:0
               </div>
             )}
           </div>
-
-          {/* Columna para opciones de comandos (Mantener para copiar, pero con menos prominencia visual si se desea) */}
-          <div className="space-y-4">
-            <h4 className="font-bold text-gray-800 border-b pb-2 mb-2">Comandos para Terminal / Cliente</h4>
-            
-            {isLinuxVM && ( // Opciones para Linux
-              <div className="space-y-3">
-                <div>
-                  <p className="font-medium text-gray-700">Via SSH (Cliente externo, IP Externa):</p>
-                  <div className="mt-1 flex items-center bg-gray-100 p-2 rounded-md text-xs">
-                    <code className="text-gray-700 flex-grow select-all break-all">{sshCommand}</code>
-                    <button
-                      onClick={() => onCopyToClipboard(sshCommand, 'Comando SSH')}
-                      title="Copiar Comando SSH"
-                      className="ml-2 p-1 text-gray-500 hover:text-gcp-blue rounded hover:bg-gray-200"
-                    >
-                      <ClipboardCopyIcon className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <p className="mt-1 text-xs text-gray-500">Reemplaza <code>your_user</code> con tu usuario en la VM.</p>
-                  {!vm.externalIp && <p className="mt-1 text-xs text-orange-500">VM sin IP externa.</p>}
-                </div>
-
-                <div>
-                  <p className="font-medium text-gray-700">Via Google Cloud Shell (gcloud CLI):</p>
-                  <div className="mt-1 flex items-center bg-gray-100 p-2 rounded-md text-xs">
-                    <code className="text-gray-700 flex-grow select-all break-all">{gcloudCommand}</code>
-                    <button
-                      onClick={() => onCopyToClipboard(gcloudCommand, 'Comando gcloud')}
-                      title="Copiar Comando gcloud"
-                      className="ml-2 p-1 text-gray-500 hover:text-gcp-blue rounded hover:bg-gray-200"
-                    >
-                      <ClipboardCopyIcon className="h-4 w-4" />
-                    </button>
-                  </div>
-                   <p className="mt-1 text-xs text-gray-500">Útil si tienes la CLI de GCP configurada localmente.</p>
-                </div>
-              </div>
-            )}
-
-            {isWindowsVM && ( // Opciones para Windows - Comando RDP
-              <div className="space-y-3">
-                <div>
-                  <p className="font-medium text-gray-700">Via Cliente RDP (<code>mstsc</code>, IP Externa):</p>
-                  <div className="mt-1 flex items-center bg-gray-100 p-2 rounded-md text-xs">
-                    <code className="text-gray-700 flex-grow select-all break-all">{rdpCommand}</code>
-                    <button
-                      onClick={() => onCopyToClipboard(rdpCommand, 'Comando RDP')}
-                      title="Copiar Comando RDP"
-                      className="ml-2 p-1 text-gray-500 hover:text-gcp-blue rounded hover:bg-gray-200"
-                    >
-                      <ClipboardCopyIcon className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Usa este comando en tu cliente de Escritorio Remoto. Recuerda que el usuario y la contraseña los facilita IT.
-                  </p>
-                  {!vm.externalIp && <p className="mt-1 text-xs text-orange-500">VM sin IP externa. RDP por IP externa no es posible directamente.</p>}
-                </div>
-              </div>
-            )}
 
             {isUnknownOS && ( // Opciones genéricas si el SO es desconocido
               <div className="space-y-3">
