@@ -230,15 +230,13 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
             Apagar
           </button>
           
-          {/* Botón Conectar (este botón ahora abre directamente el enlace en la Consola GCP) */}
+           {/* Botón Conectar (este botón ahora abre directamente el enlace en la Consola GCP) */}
           {isWindowsVM ? (
             <a 
               href={setWindowsPasswordLink} 
               target="_blank" 
               rel="noopener noreferrer" 
-              className={getActionButtonClass(canConnect, 'gcp-blue')} 
-              // 'disabled' no funciona en <a>, por eso la clase se ajusta.
-              // Si !canConnect, el botón se ve deshabilitado y no es clicable.
+              className={getActionButtonClass(canConnect, 'gcp-blue')} // Usa color de botón, no de enlace
               onClick={(e) => { if (!canConnect) e.preventDefault(); }} 
             >
               <LinkIcon className="h-5 w-5 mr-1" />
@@ -249,7 +247,7 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
               href={sshInBrowserLink} 
               target="_blank" 
               rel="noopener noreferrer" 
-              className={getActionButtonClass(canConnect, 'gcp-blue')}
+              className={getActionButtonClass(canConnect, 'gcp-blue')} // Asegúrate de que esta línea esté bien
               onClick={(e) => { if (!canConnect) e.preventDefault(); }}
             >
               <LinkIcon className="h-5 w-5 mr-1" />
