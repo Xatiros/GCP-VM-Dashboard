@@ -1,7 +1,9 @@
 import React from 'react';
 import { VirtualMachine, VMStatus } from '../types';
 import { PowerIcon, StopIcon, LinkIcon, ChipIcon, LocationMarkerIcon, ClipboardCopyIcon, CogIcon } from './icons';
-import { TerminalIcon } from './icons'; 
+import { TerminalIcon } from './icons'; // Asegúrate de importar TerminalIcon
+
+// Importa el nuevo componente popover
 import { ConnectionCommandsPopover } from './ConnectionCommandsPopover'; 
 
 interface VMCardProps {
@@ -10,7 +12,7 @@ interface VMCardProps {
   onStop: (vmId:string) => void;
   onConnect: (vm: VirtualMachine) => void; 
   onCopyToClipboard: (text: string, type: string) => void;
-  projectId: string; 
+  projectId: string; // Necesario para los enlaces de conexión
 }
 
 const StatusIndicator: React.FC<{ status: VMStatus | string }> = ({ status }) => {
@@ -81,7 +83,7 @@ const StatusIndicator: React.FC<{ status: VMStatus | string }> = ({ status }) =>
 
 export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, onCopyToClipboard, projectId }) => {
   const [showPopover, setShowPopover] = React.useState(false); 
-  const popoverRef = React.useRef<HTMLDivElement>(null); // Referencia para cerrar popover al hacer clic fuera
+  const popoverRef = React.useRef<HTMLDivElement>(null); 
 
   const isActuallyStopped = vm.status === VMStatus.STOPPED || vm.status === 'FINALIZADO' || vm.status === 'TERMINATED' || vm.status === 'PARADA';
   const isActuallyRunning = vm.status === VMStatus.RUNNING || vm.status === 'CORRER';
@@ -89,14 +91,15 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
 
   const canStart = isActuallyStopped && !isStartingOrStopping;
   const canStop = isActuallyRunning && !isStartingOrStopping;
-  const canConnect = isActuallyRunning && !isStartingOrStopping; // Habilita el botón Conectar
+  const canConnect = isActuallyRunning && !isStartingOrStopping; // Habilita el botón "Conectar" (SSH en navegador/RDP)
   const canShowOtherConnectOptions = isActuallyRunning && !isStartingOrStopping; // Habilita el botón de "más opciones"
 
+  // Enlaces directos a Google Cloud Console (usados por el botón "Conectar" principal)
   const sshInBrowserLink = `https://ssh.cloud.google.com/v2/ssh/projects/${projectId}/zones/${vm.zone}/instances/${vm.name}`;
   const setWindowsPasswordLink = `https://console.cloud.google.com/compute/instancesDetail/zones/${vm.zone}/instances/${vm.name}?project=${projectId}&tab=details`;
 
   // Detección de VM Windows (usando la nueva propiedad osType)
-  const isWindowsVM = vm.osType === 'Windows';
+  const isWindowsVM = vm.osType === 'Windows'; // Asegúrate de que vm.osType viene del backend
 
   // Manejador para cerrar el popover si se hace clic fuera
   React.useEffect(() => {
@@ -209,7 +212,7 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
         <div className="flex space-x-2"> {/* Fila principal de botones */}
           {/* Botón Encender */}
           <button
-            onClick={() => onStart(vm.id)} // Llama a onStart con el ID de la VM
+            onClick={() => onStart(vm.id)} 
             disabled={!canStart}
             className={getActionButtonClass(canStart, 'green')}
           >
@@ -219,7 +222,7 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
 
           {/* Botón Apagar */}
           <button
-            onClick={() => onStop(vm.id)} // Llama a onStop con el ID de la VM
+            onClick={() => onStop(vm.id)} 
             disabled={!canStop}
             className={getActionButtonClass(canStop, 'red')}
           >
@@ -227,15 +230,16 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
             Apagar
           </button>
           
-          {/* Botón Conectar (este botón ahora abre el modal unificado de conexión) */}
-          {/* Si es Linux, abre SSH en navegador. Si es Windows, abre gestión de contraseña RDP. */}
+          {/* Botón Conectar (este botón ahora abre directamente el enlace en la Consola GCP) */}
           {isWindowsVM ? (
             <a 
               href={setWindowsPasswordLink} 
               target="_blank" 
               rel="noopener noreferrer" 
-              className={getActionButtonClass(canConnect, 'gcp-blue')} // Usa color de botón, no de enlace
-              disabled={!canConnect}
+              className={getActionButtonClass(canConnect, 'gcp-blue')} 
+              // 'disabled' no funciona en <a>, por eso la clase se ajusta.
+              // Si !canConnect, el botón se ve deshabilitado y no es clicable.
+              onClick={(e) => { if (!canConnect) e.preventDefault(); }} 
             >
               <LinkIcon className="h-5 w-5 mr-1" />
               Conectar (RDP)
@@ -246,7 +250,7 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
               target="_blank" 
               rel="noopener noreferrer" 
               className={getActionButtonClass(canConnect, 'gcp-blue')}
-              disabled={!canConnect}
+              onClick={(e) => { if (!canConnect) e.preventDefault(); }}
             >
               <LinkIcon className="h-5 w-5 mr-1" />
               Conectar (SSH)
@@ -254,8 +258,8 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
           )}
         </div>
 
-        {/* Botón de estado deshabilitado (si la VM está en transición o no accionable) */}
-        { isStartingOrStopping || (!canStart && !canStop && !canConnectBrowser) ? ( 
+        {/* Botón de estado deshabilitado (si la VM está en transición o no es accionable) */}
+        { isStartingOrStopping || (!canStart && !canStop && !canConnect) ? ( 
             <div className="flex space-x-2 mt-2 w-full"> 
                 <button
                 disabled
