@@ -1,6 +1,6 @@
-
+// src/types.ts
 export enum VMStatus {
-  RUNNING = 'RUNNING', // Asegúrate de que es 'RUNNING' en MAYÚSCULAS
+  RUNNING = 'RUNNING',
   STOPPED = 'STOPPED',
   TERMINATED = 'TERMINATED',
   PROVISIONING = 'PROVISIONING',
@@ -17,8 +17,8 @@ export interface VirtualMachine {
   externalIp?: string;
   internalIp: string;
   machineType: string;
-  creationTimestamp?: string;
-  isWindows?: boolean; 
+  creationTimestamp?: string; 
+  osType?: 'Linux' | 'Windows' | 'Other'; // <-- ¡NUEVA PROPIEDAD!
 }
 
 export interface GCPProject {

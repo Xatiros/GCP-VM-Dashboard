@@ -1,83 +1,19 @@
 import React from 'react';
 import { VirtualMachine, VMStatus } from '../types';
 import { PowerIcon, StopIcon, LinkIcon, ChipIcon, LocationMarkerIcon, ClipboardCopyIcon, CogIcon } from './icons';
-import { TerminalIcon } from './icons'; // Asegúrate de importar TerminalIcon si lo usas, si no, puedes eliminar esta línea si no está en icons.tsx
+import { TerminalIcon } from './icons'; // Asegúrate de importar TerminalIcon
+
+// Importa el nuevo componente popover
+import { ConnectionCommandsPopover } from './ConnectionCommandsPopover'; 
 
 interface VMCardProps {
   vm: VirtualMachine;
   onStart: (vmId: string) => void;
-  onStop: (vmId: string) => void;
-  onConnect: (vm: VirtualMachine) => void; // onConnect ahora espera la VM completa
+  onStop: (vmId:string) => void;
+  onConnect: (vm: VirtualMachine) => void; 
   onCopyToClipboard: (text: string, type: string) => void;
-  projectId: string; // Necesario para el modal de conexión
+  projectId: string; 
 }
-
-// Mini-componente para el Popover de Comandos SSH/gcloud
-interface ConnectionCommandsPopoverProps {
-  vm: VirtualMachine;
-  projectId: string;
-  onCopyToClipboard: (text: string, type: string) => void;
-  onClose: () => void; // Para cerrar el popover al hacer clic fuera
-}
-
-const ConnectionCommandsPopover: React.FC<ConnectionCommandsPopoverProps> = ({ vm, projectId, onCopyToClipboard, onClose }) => {
-  const sshCommand = vm.externalIp ? `ssh your_user@${vm.externalIp}` : 'N/A (No External IP)';
-  const gcloudCommand = `gcloud compute ssh ${vm.name} --zone=${vm.zone} --project=${projectId}`;
-
-  // Usar useRef para el popover y detectar clics fuera
-  const popoverRef = React.useRef<HTMLDivElement>(null); 
-  React.useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
-        onClose(); // Cierra el popover si el clic no fue dentro de él
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [onClose]);
-
-  return (
-    <div ref={popoverRef} className="absolute top-full right-0 mt-2 w-72 bg-white rounded-lg shadow-lg z-20 border border-gray-200 p-4">
-      <h4 className="font-semibold text-gray-800 mb-2">Comandos de Conexión Adicionales:</h4>
-      
-      {/* Opción Via SSH (External IP) */}
-      <div className="mb-3">
-        <p className="font-medium text-gray-700">Via SSH (IP Externa):</p>
-        <div className="mt-1 flex items-center bg-gray-100 p-2 rounded-md text-xs">
-          <code className="text-gray-700 flex-grow select-all break-all">{sshCommand}</code>
-          <button
-            onClick={() => onCopyToClipboard(sshCommand, 'Comando SSH')}
-            title="Copiar Comando SSH"
-            className="ml-2 p-1 text-gray-500 hover:text-gcp-blue rounded hover:bg-gray-200"
-          >
-            <ClipboardCopyIcon className="h-4 w-4" />
-          </button>
-        </div>
-        <p className="mt-1 text-xs text-gray-500">Reemplaza <code>your_user</code> con tu usuario en la VM.</p>
-        {!vm.externalIp && <p className="mt-1 text-xs text-yellow-600">VM sin IP externa.</p>}
-      </div>
-
-      {/* Opción Via Google Cloud Shell (gcloud) */}
-      <div>
-        <p className="font-medium text-gray-700">Via Google Cloud Shell (gcloud):</p>
-        <div className="mt-1 flex items-center bg-gray-100 p-2 rounded-md text-xs">
-          <code className="text-gray-700 flex-grow select-all break-all">{gcloudCommand}</code>
-          <button
-            onClick={() => onCopyToClipboard(gcloudCommand, 'Comando gcloud')}
-            title="Copiar Comando gcloud"
-            className="ml-2 p-1 text-gray-500 hover:text-gcp-blue rounded hover:bg-gray-200"
-          >
-            <ClipboardCopyIcon className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-      
-    </div>
-  );
-};
-
 
 const StatusIndicator: React.FC<{ status: VMStatus | string }> = ({ status }) => {
   let bgColor = 'bg-gray-400';
@@ -147,6 +83,7 @@ const StatusIndicator: React.FC<{ status: VMStatus | string }> = ({ status }) =>
 
 export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, onCopyToClipboard, projectId }) => {
   const [showPopover, setShowPopover] = React.useState(false); 
+  const popoverRef = React.useRef<HTMLDivElement>(null); // Referencia para cerrar popover al hacer clic fuera
 
   const isActuallyStopped = vm.status === VMStatus.STOPPED || vm.status === 'FINALIZADO' || vm.status === 'TERMINATED' || vm.status === 'PARADA';
   const isActuallyRunning = vm.status === VMStatus.RUNNING || vm.status === 'CORRER';
@@ -154,8 +91,27 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
 
   const canStart = isActuallyStopped && !isStartingOrStopping;
   const canStop = isActuallyRunning && !isStartingOrStopping;
-  const canConnectBrowser = isActuallyRunning && !isStartingOrStopping; // Habilita el botón Conectar (SSH en navegador)
+  const canConnect = isActuallyRunning && !isStartingOrStopping; // Habilita el botón Conectar
   const canShowOtherConnectOptions = isActuallyRunning && !isStartingOrStopping; // Habilita el botón de "más opciones"
+
+  const sshInBrowserLink = `https://ssh.cloud.google.com/v2/ssh/projects/${projectId}/zones/${vm.zone}/instances/${vm.name}`;
+  const setWindowsPasswordLink = `https://console.cloud.google.com/compute/instancesDetail/zones/${vm.zone}/instances/${vm.name}?project=${projectId}&tab=details`;
+
+  // Detección de VM Windows (usando la nueva propiedad osType)
+  const isWindowsVM = vm.osType === 'Windows';
+
+  // Manejador para cerrar el popover si se hace clic fuera
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
+        setShowPopover(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [popoverRef]);
 
   // Determinar la clase CSS del botón de acción (verde/rojo o gris)
   const getActionButtonClass = (isEnabled: boolean, baseColor: string) => 
@@ -255,7 +211,7 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
         <div className="flex space-x-2"> {/* Fila principal de botones */}
           {/* Botón Encender */}
           <button
-            onClick={onStart}
+            onClick={() => onStart(vm.id)} // Llama a onStart con el ID de la VM
             disabled={!canStart}
             className={getActionButtonClass(canStart, 'green')}
           >
@@ -265,7 +221,7 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
 
           {/* Botón Apagar */}
           <button
-            onClick={onStop}
+            onClick={() => onStop(vm.id)} // Llama a onStop con el ID de la VM
             disabled={!canStop}
             className={getActionButtonClass(canStop, 'red')}
           >
@@ -273,18 +229,34 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
             Apagar
           </button>
           
-           {/* Botón Conectar (este botón ahora abre el modal unificado de conexión) */}
-          <button
-           onClick={() => onConnect(vm)} 
-            disabled={!canConnectBrowser} 
-            className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gcp-blue disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <LinkIcon className="h-5 w-5 mr-1" />
-            Conectar
-          </button>
+          {/* Botón Conectar (este botón ahora abre el modal unificado de conexión) */}
+          {/* Si es Linux, abre SSH en navegador. Si es Windows, abre gestión de contraseña RDP. */}
+          {isWindowsVM ? (
+            <a 
+              href={setWindowsPasswordLink} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className={getActionButtonClass(canConnect, 'gcp-blue')} // Usa color de botón, no de enlace
+              disabled={!canConnect}
+            >
+              <LinkIcon className="h-5 w-5 mr-1" />
+              Conectar (RDP)
+            </a>
+          ) : (
+            <a 
+              href={sshInBrowserLink} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className={getActionButtonClass(canConnect, 'gcp-blue')}
+              disabled={!canConnect}
+            >
+              <LinkIcon className="h-5 w-5 mr-1" />
+              Conectar (SSH)
+            </a>
+          )}
         </div>
 
-        {/* Si la VM está en transición o no es accionable, mostrar un botón de estado deshabilitado */}
+        {/* Botón de estado deshabilitado (si la VM está en transición o no accionable) */}
         { isStartingOrStopping || (!canStart && !canStop && !canConnectBrowser) ? ( 
             <div className="flex space-x-2 mt-2 w-full"> 
                 <button
