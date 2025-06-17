@@ -10,7 +10,8 @@ const computePackage = require('@google-cloud/compute');
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 8080; // Usar 8080 como fallback consistente con Dockerfile
+// Usar el puerto de Cloud Run (PORT) o 8080 como fallback
+const port = process.env.PORT || 8080; 
 
 // --- CONFIGURACIÓN DE AUTENTICACIÓN ---
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID; 
@@ -178,14 +179,12 @@ app.get('/api/vms/:projectId', authenticateToken, async (req, res) => {
 
     console.log(`[BACKEND] Se encontraron ${vms.length} VMs en las zonas europeas de GCP.`);
 
-    const mappedVms = vms.map((vm: any) => { // Asegúrate que 'vm' puede tener la propiedad 'disks' de la API
-        // Heurística para detectar Windows: Buscar licencias de Windows en los discos.
-        // La API de Compute Engine devuelve información de discos en vm.disks.
+    const mappedVms = vms.map((vm: any) => { 
         const isWindows = vm.disks && vm.disks.length > 0 && 
                           vm.disks[0].licenses && 
                           vm.disks[0].licenses.some((license: string) => license.includes('windows'));
 
-        const osType = isWindows ? 'Windows' : 'Linux'; // Si no detecta Windows, asume Linux.
+        const osType = isWindows ? 'Windows' : 'Linux';
 
         return {
             id: vm.id,
@@ -197,7 +196,7 @@ app.get('/api/vms/:projectId', authenticateToken, async (req, res) => {
             internalIp: vm.networkInterfaces && vm.networkInterfaces[0]?.networkIP || undefined,
             machineType: vm.machineType.split('/').pop(), 
             creationTimestamp: vm.creationTimestamp,
-            osType: osType, // ¡Añadimos el tipo de SO!
+            osType: osType,
         };
     });
 
@@ -223,13 +222,13 @@ app.post('/api/vms/start/:vmId', authenticateToken, async (req, res) => {
       zone: zone,
       instance: vmId,
     });
-    
+
     if (!globalOperationsClient || typeof globalOperationsClient.wait !== 'function') {
       console.warn(`[BACKEND] GlobalOperationsClient no inicializado o no tiene el método 'wait()' para VM ${vmId}. El estado puede tardar en actualizarse.`);
     } else {
         try {
             const zoneNameForWait = zone; 
-            
+
             await globalOperationsClient.wait({
                 project: projectId,
                 zone: zoneNameForWait, 
@@ -246,7 +245,7 @@ app.post('/api/vms/start/:vmId', authenticateToken, async (req, res) => {
       zone: zone, 
       instance: vmId,
     });
-    
+
     const actualStatusFromGCP = updatedVm.status;
     let statusToReturn = actualStatusFromGCP;
 
@@ -325,7 +324,7 @@ app.post('/api/vms/stop/:vmId', authenticateToken, async (req, res) => {
             statusToReturn = 'RUNNING'; 
         }
     }
-    
+
     console.log(`[BACKEND] VM ${vmId} detenida. Estado actualizado (antes de mapear): ${actualStatusFromGCP}. Estado final devuelto: ${statusToReturn}`);
 
     const mappedVm = {
@@ -350,5 +349,5 @@ app.post('/api/vms/stop/:vmId', authenticateToken, async (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Backend server listening at http://localhost:${port}`);
+console.log(Backend server listening at http://localhost:${port});
 });
