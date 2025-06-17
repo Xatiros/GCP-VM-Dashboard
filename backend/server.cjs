@@ -52,7 +52,7 @@ app.get('/', (req, res) => {
 let instancesClient;
 let zonesClient;
 let globalOperationsClient;
-let imagesClient; // Añadir cliente de imágenes para inspeccionar discos
+// imagesClient ya no es necesario si siempre asumimos Windows, así que lo eliminamos.
 
 const GCP_PROJECT_ID = process.env.GCP_PROJECT_ID; 
 
@@ -97,20 +97,6 @@ try {
   process.exit(1);
 }
 
-// Inicializar ImagesClient
-try {
-  if (computePackage.v1 && computePackage.v1.ImagesClient && typeof computePackage.v1.ImagesClient === 'function') {
-    imagesClient = new computePackage.v1.ImagesClient({ projectId: GCP_PROJECT_ID });
-    console.log("Cliente de Imágenes inicializado con: new v1.ImagesClient()");
-  } else {
-    throw new Error("No se encontró el constructor ImagesClient en computePackage.v1.");
-  }
-} catch (e) {
-  console.error("Error fatal al inicializar Cliente de Imágenes:", e.message);
-  process.exit(1);
-}
-
-
 console.log("\n--- Estado de los clientes de Compute después de la inicialización ---");
 console.log("instancesClient:", instancesClient ? 'Inicializado' : 'ERROR');
 console.log("instancesClient.list (si existe):", typeof instancesClient.list === 'function' ? 'Function' : 'Undefined/Not a function');
@@ -120,57 +106,20 @@ console.log("zonesClient:", zonesClient ? 'Inicializado' : 'ERROR');
 console.log("zonesClient.list (si existe):", typeof zonesClient.list === 'function' ? 'Function' : 'Undefined/Not a function');
 console.log("globalOperationsClient:", globalOperationsClient ? 'Inicializado' : 'ERROR');
 console.log("globalOperationsClient.wait (si existe):", typeof globalOperationsClient.wait === 'function' ? 'Function' : 'Undefined/Not a function');
-console.log("imagesClient:", imagesClient ? 'Inicializado' : 'ERROR');
-console.log("imagesClient.get (si existe):", typeof imagesClient.get === 'function' ? 'Function' : 'Undefined/Not a function');
+// Eliminado: console.log("imagesClient:", imagesClient ? 'Inicializado' : 'ERROR');
+// Eliminado: console.log("imagesClient.get (si existe):", typeof imagesClient.get === 'function' ? 'Function' : 'Undefined/Not a function');
 console.log("----------------------------------------------------------\n");
 
 /**
- * Intenta determinar el tipo de sistema operativo de una VM basada en su disco de arranque.
- * @param {object} vm - Objeto VM de la API de GCP.
- * @returns {Promise<string>} 'Windows', 'Linux', o 'Unknown'.
+ * Asume que todas las VMs son de tipo Windows.
+ * @param {object} vm - Objeto VM de la API de GCP. (Ya no se usa la información de la VM para detección)
+ * @returns {Promise<string>} Siempre resuelve a 'Windows'.
  */
 async function getVmOsType(vm) {
-  if (!imagesClient || typeof imagesClient.get !== 'function') {
-    console.warn("Advertencia: imagesClient no está inicializado. No se puede determinar el tipo de SO.");
-    return 'Unknown';
-  }
-
-  // Verificar si hay discos y si el primero es un disco de arranque
-  if (vm.disks && vm.disks.length > 0 && vm.disks[0].boot) {
-    const bootDisk = vm.disks[0];
-    // La fuente de la imagen es una URL, necesitamos extraer el nombre de la imagen
-    const sourceImageLink = bootDisk.initializeParams?.sourceImage;
-
-    if (sourceImageLink) {
-      try {
-        // La URL de la imagen puede ser global, de proyecto o de una familia de imágenes.
-        // Ej: https://www.googleapis.com/compute/v1/projects/debian-cloud/global/images/debian-11-bullseye-v20240312
-        // Ej: https://www.googleapis.com/compute/v1/projects/windows-cloud/global/images/windows-server-2019-dc-v20240315
-
-        // Intentar extraer el nombre de la imagen de la URL
-        const imagePathParts = sourceImageLink.split('/');
-        const imageName = imagePathParts[imagePathParts.length - 1];
-
-        // Inferir el SO basado en el nombre de la imagen
-        if (imageName.toLowerCase().includes('windows')) {
-          return 'Windows';
-        } else if (imageName.toLowerCase().includes('debian') ||
-                   imageName.toLowerCase().includes('ubuntu') ||
-                   imageName.toLowerCase().includes('centos') ||
-                   imageName.toLowerCase().includes('rhel') ||
-                   imageName.toLowerCase().includes('sles') ||
-                   imageName.toLowerCase().includes('coreos') ||
-                   imageName.toLowerCase().includes('linux')) {
-          return 'Linux';
-        }
-      } catch (imageError) {
-        console.warn(`Error al intentar determinar el SO para VM ${vm.name} desde la imagen:`, imageError.message);
-      }
-    }
-  }
-  // Si no se pudo determinar por el disco, podrías intentar con etiquetas si las usas de forma consistente.
-  // Por ahora, si no se encuentra, devuelve 'Unknown'.
-  return 'Unknown';
+  // Si todas tus VMs son Windows, simplemente devuelve 'Windows'.
+  // Esto simplifica el código y evita la detección basada en la imagen.
+  console.log(`[BACKEND] Asumiendo VM ${vm.name} como 'Windows'.`);
+  return 'Windows';
 }
 
 
@@ -245,8 +194,8 @@ app.get('/api/vms/:projectId', authenticateToken, async (req, res) => {
 
     console.log(`[BACKEND] Se encontraron ${vms.length} VMs en las zonas europeas de GCP.`);
 
-    const mappedVms = await Promise.all(vms.map(async (vm) => { // Usar Promise.all para esperar las llamadas asíncronas
-      const osType = await getVmOsType(vm); // Obtener el tipo de SO
+    const mappedVms = await Promise.all(vms.map(async (vm) => { 
+      const osType = await getVmOsType(vm); // Obtener el tipo de SO (que ahora siempre es 'Windows')
       return {
         id: vm.id,
         name: vm.name,
@@ -315,7 +264,7 @@ app.post('/api/vms/start/:vmId', authenticateToken, async (req, res) => {
         statusToReturn = 'RUNNING';
     }
 
-    // Obtener el tipo de SO para la VM actualizada
+    // Obtener el tipo de SO para la VM actualizada (que ahora siempre es 'Windows')
     const osType = await getVmOsType(updatedVm);
 
     console.log(`[BACKEND] VM ${vmId} iniciada. Estado actualizado (antes de mapear): ${actualStatusFromGCP}. Estado final devuelto: ${statusToReturn}. SO: ${osType}`);
@@ -386,7 +335,7 @@ app.post('/api/vms/stop/:vmId', authenticateToken, async (req, res) => {
         }
     }
 
-    // Obtener el tipo de SO para la VM actualizada
+    // Obtener el tipo de SO para la VM actualizada (que ahora siempre es 'Windows')
     const osType = await getVmOsType(updatedVm);
 
     console.log(`[BACKEND] VM ${vmId} detenida. Estado actualizado (antes de mapear): ${actualStatusFromGCP}. Estado final devuelto: ${statusToReturn}. SO: ${osType}`);
