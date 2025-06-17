@@ -179,26 +179,26 @@ app.get('/api/vms/:projectId', authenticateToken, async (req, res) => {
 
     console.log(`[BACKEND] Se encontraron ${vms.length} VMs en las zonas europeas de GCP.`);
 
-    const mappedVms = vms.map((vm: any) => { 
+    const mappedVms = vms.map((vm) => { 
         const isWindows = vm.disks && vm.disks.length > 0 && 
-                          vm.disks[0].licenses && 
-                          vm.disks[0].licenses.some((license: string) => license.includes('windows'));
+                              vm.disks[0].licenses && 
+                              vm.disks[0].licenses.some((license) => license.includes('windows'));
 
-        const osType = isWindows ? 'Windows' : 'Linux';
+            const osType = isWindows ? 'Windows' : 'Linux';
 
-        return {
-            id: vm.id,
-            name: vm.name,
-            status: vm.status === 'CORRER' ? 'RUNNING' : (vm.status === 'PARADA' ? 'STOPPED' : vm.status),
-            zone: vm.zone.split('/').pop(), 
-            region: vm.zone.split('/')[4].split('-').slice(0, 2).join('-'), 
-            externalIp: vm.networkInterfaces && vm.networkInterfaces[0]?.accessConfigs?.[0]?.natIP || undefined,
-            internalIp: vm.networkInterfaces && vm.networkInterfaces[0]?.networkIP || undefined,
-            machineType: vm.machineType.split('/').pop(), 
-            creationTimestamp: vm.creationTimestamp,
-            osType: osType,
-        };
-    });
+            return {
+                id: vm.id,
+                name: vm.name,
+                status: vm.status === 'CORRER' ? 'RUNNING' : (vm.status === 'PARADA' ? 'STOPPED' : vm.status),
+                zone: vm.zone.split('/').pop(), 
+                region: vm.zone.split('/')[4].split('-').slice(0, 2).join('-'), 
+                externalIp: vm.networkInterfaces && vm.networkInterfaces[0]?.accessConfigs?.[0]?.natIP || undefined,
+                internalIp: vm.networkInterfaces && vm.networkInterfaces[0]?.networkIP || undefined,
+                machineType: vm.machineType.split('/').pop(), 
+                creationTimestamp: vm.creationTimestamp,
+                osType: osType,
+            };
+        });
 
     console.log("[BACKEND] VMs mapeadas, enviando respuesta al frontend...");
     res.json(mappedVms);
