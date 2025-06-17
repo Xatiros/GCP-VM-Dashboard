@@ -1,9 +1,7 @@
 import React from 'react';
 import { VirtualMachine, VMStatus } from '../types';
 import { PowerIcon, StopIcon, LinkIcon, ChipIcon, LocationMarkerIcon, ClipboardCopyIcon, CogIcon } from './icons';
-import { TerminalIcon } from './icons'; // Asegúrate de importar TerminalIcon
-
-// Importa el nuevo componente popover
+import { TerminalIcon } from './icons'; 
 import { ConnectionCommandsPopover } from './ConnectionCommandsPopover'; 
 
 interface VMCardProps {
