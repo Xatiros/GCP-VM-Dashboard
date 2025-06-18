@@ -294,7 +294,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col">
       <Header 
-        appName="Cloud VM Manager" {/* ¡Ya actualizado! */}
+        appName="Cloud VM Manager"
         projects={ALL_PROJECTS}
         selectedProject={selectedProject}
         onProjectChange={setSelectedProject}
