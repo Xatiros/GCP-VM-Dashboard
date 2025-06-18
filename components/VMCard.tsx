@@ -1,16 +1,16 @@
 // src/components/VMCard.tsx
 import React from 'react';
 import { VirtualMachine, VMStatus } from '../types';
-import { PowerIcon, StopIcon, LinkIcon, ChipIcon, LocationMarkerIcon, ClipboardCopyIcon, CogIcon, TerminalIcon } from './icons'; 
-// Asegúrate de que todos los iconos que usas están importados correctamente desde './icons'
+import { PowerIcon, StopIcon, LinkIcon, ChipIcon, LocationMarkerIcon, ClipboardCopyIcon, CogIcon } from './icons'; 
+// Eliminado TerminalIcon de las importaciones, ya no se usa.
 
 interface VMCardProps {
   vm: VirtualMachine;
-  onStartVM: (vmId: string) => void; // ¡CAMBIADO A onStartVM!
-  onStopVM: (vmId:string) => void;   // ¡CAMBIADO A onStopVM!
+  onStartVM: (vmId: string) => void; 
+  onStopVM: (vmId:string) => void;   
   onConnectVM: (vm: VirtualMachine) => void; // onConnectVM para el modal
   onCopyToClipboard: (text: string, type: string) => void;
-  projectId: string; // Necesario para los enlaces de conexión
+  projectId: string; 
 }
 
 const StatusIndicator: React.FC<{ status: VMStatus | string }> = ({ status }) => {
@@ -72,6 +72,7 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStartVM, onStopVM, onConne
   // Habilitación de acciones
   const canStart = isStopped && !isTransitioning;
   const canStop = isRunning && !isTransitioning;
+  // El botón de conexión ahora solo necesita que la VM esté corriendo y no en transición (la IP externa se valida en el modal)
   const canOpenConnectModal = isRunning && !isTransitioning; 
 
   // Detección de VM Windows
@@ -100,16 +101,16 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStartVM, onStopVM, onConne
       <div className="p-5 border-b border-gray-200">
         <div className="flex justify-between items-center relative"> 
           <h3 className="text-xl font-bold text-gray-800 truncate" title={vm.name}>{vm.name}</h3>
-          {/* Botón de "Más opciones de conexión" (TerminalIcon) - Abre el ConnectModal unificado */}
-          {!isTransitioning && ( 
+          {/* ELIMINADO: Botón de "Más opciones de conexión" (TerminalIcon) */}
+          {/* {!isTransitioning && ( 
             <button 
-              onClick={() => onConnectVM(vm)} // Llama a onConnectVM
+              onClick={() => onConnectVM(vm)} 
               className="ml-2 p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400"
               title="Más opciones de conexión"
             >
               <TerminalIcon className="h-6 w-6" /> 
             </button>
-          )}
+          )} */}
         </div>
         <div className="mt-1 flex items-center justify-between">
           <StatusIndicator status={vm.status} />
@@ -162,7 +163,7 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStartVM, onStopVM, onConne
         <div className="flex space-x-2"> {/* Fila principal de botones */}
           {/* Botón Encender */}
           <button
-            onClick={() => onStartVM(vm.id)} // Llama a onStartVM
+            onClick={() => onStartVM(vm.id)} 
             disabled={!canStart}
             className={getActionButtonClass(canStart, 'green')}
           >
@@ -172,7 +173,7 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStartVM, onStopVM, onConne
 
           {/* Botón Apagar */}
           <button
-            onClick={() => onStopVM(vm.id)} // Llama a onStopVM
+            onClick={() => onStopVM(vm.id)} 
             disabled={!canStop}
             className={getActionButtonClass(canStop, 'red')}
           >
@@ -180,7 +181,7 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStartVM, onStopVM, onConne
             Apagar
           </button>
           
-          {/* BOTÓN CONECTAR - AHORA SIEMPRE ABRE EL MODAL */}
+          {/* BOTÓN CONECTAR - AHORA ES EL ÚNICO BOTÓN PARA ACCEDER AL MODAL DE INSTRUCCIONES */}
           <button 
             onClick={() => onConnectVM(vm)} // Llama a onConnectVM para abrir el modal
             disabled={!canOpenConnectModal} // Habilita/deshabilita el botón según si se puede conectar
@@ -189,7 +190,7 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStartVM, onStopVM, onConne
                 ? 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500' // Estilo activo
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed' // Estilo deshabilitado
               } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-50`}
-            title={canOpenConnectModal ? "Conectar a la máquina virtual" : "La VM debe estar en estado RUNNING para conectar"}
+            title={canOpenConnectModal ? "Ver instrucciones de conexión" : "La VM debe estar en estado RUNNING para ver las instrucciones"}
           >
             <LinkIcon className="h-5 w-5 mr-1" />
             Conectar
