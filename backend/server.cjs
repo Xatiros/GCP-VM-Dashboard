@@ -7,18 +7,35 @@ const jwt = require('jsonwebtoken');
 
 const computePackage = require('@google-cloud/compute');
 
+// Cargar las variables de entorno desde .env lo primero
 dotenv.config();
 
 const app = express();
-// Cloud Run inyecta la variable PORT, usarla si está disponible, sino 8080 como fallback.
 const port = process.env.PORT || 8080; 
 
 // --- CONFIGURACIÓN DE AUTENTICACIÓN ---
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID; 
-const JWT_SECRET = process.env.JWT_SECRET || '1823ca911266eafe96c0b42a9331fc097b1a84a974e4e206208685d93dc37bddd2c68fa9a094548da1ad5a3f3936a9fc1d5b6d7d80c684494c60654c07bb197984f34ac1e6ea34ce3d9a6a4e89a3dfbbb1081c1bf5752102e9bf782e3bd3c1711f83035b2c0248c32be814eefa615590b0eb7c946d0adfed5cc4f726eb0ec343a8859c91b4fcb7f7b91e5e2cc626daf4bfb3bcc81298177f494f21fb8d9068b76ebcde811d097152761203e03550c60bc2052130fae3411baf5a5b7d333d6497795fea3e5ad8132ba2508644ed73c394c1046936aa1ad9e994da6f6dd6610ac80bfc9adff55009d401033917daee194fbbdcc1c38732be40e83b8bd35f66f5e5'; 
+const JWT_SECRET = process.env.JWT_SECRET; 
 const ALLOWED_DOMAIN = 'gemigeo.com';
 
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
+
+// --- VALIDACIÓN CRÍTICA DE VARIABLES DE ENTORNO ---
+const GCP_PROJECT_ID = process.env.GCP_PROJECT_ID; 
+
+if (!GCP_PROJECT_ID) {
+    console.error("Error fatal: La variable de entorno GCP_PROJECT_ID no está definida. La aplicación no puede iniciarse.");
+    process.exit(1); 
+}
+if (!GOOGLE_CLIENT_ID) {
+    console.error("Error fatal: GOOGLE_CLIENT_ID no está definido. La aplicación no puede iniciarse.");
+    process.exit(1);
+}
+if (!JWT_SECRET || JWT_SECRET.length < 32) { 
+    console.error("Error fatal: JWT_SECRET no está definido o es demasiado corto (se recomienda al menos 32 caracteres). La aplicación no puede iniciarse de forma segura.");
+    process.exit(1);
+}
+// --- FIN VALIDACIÓN ---
 
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -55,27 +72,16 @@ let zonesClient;
 let globalOperationsClient;
 let imagesClient; 
 
-const GCP_PROJECT_ID = process.env.GCP_PROJECT_ID; 
-
-// Validar que el PROJECT_ID esté definido, es crítico para la inicialización
-if (!GCP_PROJECT_ID) {
-    console.error("Error fatal: La variable de entorno GCP_PROJECT_ID no está definida. La aplicación no puede iniciarse.");
-    // No salimos de process aquí, ya que en Cloud Run preferimos que falle el contenedor y los logs lo muestren.
-    // throw new Error("GCP_PROJECT_ID no está definida.");
-}
-
 // Inicialización de clientes de Compute Engine
-// Usamos bloques try/catch para cada cliente para registrar errores específicos al inicio
 try {
   if (computePackage.v1 && computePackage.v1.InstancesClient && typeof computePackage.v1.InstancesClient === 'function') {
     instancesClient = new computePackage.v1.InstancesClient({ projectId: GCP_PROJECT_ID });
-    console.log("Cliente de Instancias (para start/stop/list) inicializado.");
+    console.log("Cliente de Instancias inicializado.");
   } else {
     throw new Error("No se encontró el constructor InstancesClient en computePackage.v1.");
   }
 } catch (e) {
   console.error("Error fatal al inicializar Cliente de Instancias:", e.message);
-  // Un error aquí podría impedir que el servidor escuche, pero la traza detallada en logs es lo importante
 }
 
 try {
@@ -134,18 +140,15 @@ async function getVmOsType(vm) {
   if (vm.disks && vm.disks.length > 0 && vm.disks[0].boot) {
     const bootDisk = vm.disks[0];
     
-    // --- NUEVO LOG CRÍTICO PARA DEPURACIÓN DE LA ESTRUCTURA DEL DISCO ---
+    // --- Log el contenido completo del bootDisk para depuración ---
     console.log(`[DEBUG DISKS] VM: ${vm.name}, bootDisk content: ${JSON.stringify(bootDisk, null, 2)}`);
-    // --- FIN NUEVO LOG CRÍTICO ---
+    // --- Fin Log ---
 
     const sourceImageLink = bootDisk.sourceImage || bootDisk.initializeParams?.sourceImage;
 
     console.log(`[getVmOsType] VM: ${vm.name}, SourceImageLink: ${sourceImageLink}`); 
     
     if (sourceImageLink) {
-      // ... (el resto de tu lógica de extracción de project/image y llamada a imagesClient.get)
-      // Esta parte no cambia ahora, ya que el problema está en sourceImageLink ser undefined
-      
       try {
         const urlParts = sourceImageLink.split('/');
         let imageProject = GCP_PROJECT_ID; 
@@ -213,6 +216,7 @@ async function getVmOsType(vm) {
   console.log(`[getVmOsType] VM: ${vm.name}, No se pudo determinar el SO. Devolviendo 'Unknown'.`);
   return 'Unknown';
 }
+
 
 app.post('/api/auth/google', async (req, res) => {
   const { id_token } = req.body;
@@ -372,8 +376,19 @@ app.post('/api/vms/start/:vmId', authenticateToken, async (req, res) => {
     };
     res.json(mappedVm);
   } catch (error) {
-    console.error('Error starting VM:', error.message);
-    res.status(500).json({ message: 'Failed to start VM on Google Cloud.', error: error.message, stack: error.stack });
+    // --- NUEVOS LOGS DETALLADOS DE ERRORES DE START_VM ---
+    console.error(`[BACKEND][START_VM_ERROR] Error al iniciar VM ${vmId}:`);
+    console.error(`[BACKEND][START_VM_ERROR] Mensaje de error general: ${error.message}`);
+    if (error.code) console.error(`[BACKEND][START_VM_ERROR] Código de error GCP: ${error.code}`);
+    if (error.errors && error.errors.length > 0) {
+        console.error(`[BACKEND][START_VM_ERROR] Errores detallados de GCP: ${JSON.stringify(error.errors, null, 2)}`);
+    } else if (error.details) { // A veces, los errores se anidan en 'details'
+        console.error(`[BACKEND][START_VM_ERROR] Detalles adicionales del error: ${JSON.stringify(error.details, null, 2)}`);
+    }
+    // --- FIN NUEVOS LOGS ---
+
+    // Este mensaje se envía al frontend
+    res.status(500).json({ message: 'Failed to start VM on Google Cloud via backend.', error: error.message, stack: error.stack });
   }
 });
 
