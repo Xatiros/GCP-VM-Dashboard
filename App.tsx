@@ -42,7 +42,7 @@ const App: React.FC = () => {
   // --- FIN CLIENT ID ---
 
   const ALL_PROJECTS: GCPProject[] = [
-    { id: GCP_PROJECT_ID_REAL, name: 'Mi Proyecto Principal GCP' },
+    { id: GCP_PROJECT_ID_REAL, name: 'Puestos de Trabajos Potentes' },
   ];
   const [selectedProject, setSelectedProject] = useState<GCPProject>(
     ALL_PROJECTS.find(p => p.id === GCP_PROJECT_ID_REAL) || ALL_PROJECTS[0]
