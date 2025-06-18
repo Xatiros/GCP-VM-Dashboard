@@ -134,13 +134,18 @@ async function getVmOsType(vm) {
   if (vm.disks && vm.disks.length > 0 && vm.disks[0].boot) {
     const bootDisk = vm.disks[0];
     
-    // --- CAMBIO CLAVE AQUÍ: Intentar primero bootDisk.sourceImage ---
+    // --- NUEVO LOG CRÍTICO PARA DEPURACIÓN DE LA ESTRUCTURA DEL DISCO ---
+    console.log(`[DEBUG DISKS] VM: ${vm.name}, bootDisk content: ${JSON.stringify(bootDisk, null, 2)}`);
+    // --- FIN NUEVO LOG CRÍTICO ---
+
     const sourceImageLink = bootDisk.sourceImage || bootDisk.initializeParams?.sourceImage;
-    // --- FIN CAMBIO CLAVE ---
 
     console.log(`[getVmOsType] VM: ${vm.name}, SourceImageLink: ${sourceImageLink}`); 
     
     if (sourceImageLink) {
+      // ... (el resto de tu lógica de extracción de project/image y llamada a imagesClient.get)
+      // Esta parte no cambia ahora, ya que el problema está en sourceImageLink ser undefined
+      
       try {
         const urlParts = sourceImageLink.split('/');
         let imageProject = GCP_PROJECT_ID; 
@@ -208,7 +213,6 @@ async function getVmOsType(vm) {
   console.log(`[getVmOsType] VM: ${vm.name}, No se pudo determinar el SO. Devolviendo 'Unknown'.`);
   return 'Unknown';
 }
-
 
 app.post('/api/auth/google', async (req, res) => {
   const { id_token } = req.body;
