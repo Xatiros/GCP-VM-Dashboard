@@ -1,61 +1,36 @@
 # frontend/cloudbuild.yaml
 steps:
-# Paso 0: Limpiar node_modules, package-lock.json, dist y caché npm
-- name: 'gcr.io/cloud-builders/npm'
-  entrypoint: 'sh'
-  args: ['-c', 'rm -rf node_modules package-lock.json yarn.lock dist && npm cache clean --force'] 
-  dir: '.'
-
-# Paso 1: Instalar dependencias limpiamente
-- name: 'gcr.io/cloud-builders/npm'
-  args: ['install']
-  dir: '.' 
-
-# Paso 2: Construir la aplicación React (Vite)
-- name: 'gcr.io/cloud-builders/npm'
-  args: ['run', 'build']
-  dir: '.'
-  # ⬇️⬇️⬇️ ¡CRÍTICO! AÑADE ESTO AQUÍ ⬇️⬇️⬇️
-  env:
-    # Esta variable VITE_APP_BACKEND_AUTH_URL se leerá en tu App.tsx a través de process.env.VITE_APP_BACKEND_AUTH_URL
-    # Asegúrate de que la URL sea exactamente la de tu backend de Cloud Run.
-    - 'VITE_APP_BACKEND_AUTH_URL=https://gcp-vm-dashboard-backend-service-780691668337.europe-southwest1.run.app/api/auth/google' #
-    # Si tienes otras variables para el frontend (ej. GEMINI_API_KEY), también deben ir aquí
-    # Por ejemplo: - 'VITE_APP_GEMINI_API_KEY=${_GEMINI_API_KEY}'
-  # ⬆️⬆️⬆️ FIN DE LA ADICIÓN CRÍTICA ⬆️⬆️⬆️
-
-# Paso 3: Construir la imagen Docker de Nginx con los archivos de tu app
+# Paso 1: Construir la imagen Docker del frontend
 - name: 'gcr.io/cloud-builders/docker'
   args: [
     'build', 
     '-t', 
     'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA', 
-    '.' 
+    '.'
   ]
-  dir: '.'
+  dir: 'frontend' # Importante: Indica que el Dockerfile del frontend está en la carpeta 'frontend'
 
-# Paso 4: Subir la imagen a Artifact Registry
+# Paso 2: Subir la imagen Docker a Artifact Registry
 - name: 'gcr.io/cloud-builders/docker'
   args: [
     'push', 
     'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA'
   ]
 
-# Paso 5: Desplegar la imagen en Cloud Run
+# Paso 3: Desplegar la imagen en Cloud Run
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-  entrypoint: 'gcloud'
+  entrypoint: 'gcloud' 
   args: [
-    'run', 'deploy', 'gcp-vm-dashboard-frontend-service',
-    '--image', 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA',
-    '--region', 'europe-southwest1',
+    'run', 'deploy', 'gcp-vm-dashboard-frontend-service', # <-- ¡Nombre de tu SERVICIO FRONTEND!
+    '--image', 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA', 
+    '--region', 'europe-southwest1', # Tu región
     '--platform', 'managed',
-    '--allow-unauthenticated'
+    '--allow-unauthenticated', # Permite acceso público a tu frontend (ajusta si es privado)
+    # --- ¡LÍNEA CRÍTICA! Inyectar la URL del BACKEND para que el frontend sepa dónde llamar ---
+    '--set-env-vars', 'VITE_APP_BACKEND_API_BASE_URL=https://gcp-vm-dashboard-backend-service-780691668337.europe-southwest1.run.app/api' # <-- ¡URL BASE REAL DE TU BACKEND DESPLEGADO!
   ]
-  env:
-    - 'CLOUDSDK_COMPUTE_REGION=europe-southwest1'
-
 images:
 - 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA'
 
 options:
-  logging: CLOUD_LOGGING_ONLY #
+  logging: CLOUD_LOGGING_ONLY
