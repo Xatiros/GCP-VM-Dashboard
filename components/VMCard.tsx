@@ -2,7 +2,6 @@
 import React from 'react';
 import { VirtualMachine, VMStatus } from '../types';
 import { PowerIcon, StopIcon, LinkIcon, ChipIcon, LocationMarkerIcon, ClipboardCopyIcon, CogIcon, TerminalIcon } from './icons'; 
-// Asegúrate de que todos los iconos que usas están importados correctamente desde './icons'
 
 interface VMCardProps {
   vm: VirtualMachine;
@@ -13,7 +12,6 @@ interface VMCardProps {
   projectId: string; // Necesario para los enlaces de conexión
 }
 
-// Helper para el indicador de estado (no cambia, pero lo incluyo completo por contexto)
 const StatusIndicator: React.FC<{ status: VMStatus | string }> = ({ status }) => {
   let bgColor = 'bg-gray-400';
   let textColor = 'text-gray-700';
@@ -45,7 +43,7 @@ const StatusIndicator: React.FC<{ status: VMStatus | string }> = ({ status }) =>
       textColor = 'text-orange-700';
       ringColor = 'ring-orange-400';
       break;
-    default: // Para cualquier otro estado no esperado
+    default: 
       bgColor = 'bg-gray-400';
       textColor = 'text-gray-700';
       ringColor = 'ring-gray-400';
@@ -65,7 +63,7 @@ const StatusIndicator: React.FC<{ status: VMStatus | string }> = ({ status }) =>
 
 
 export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, onCopyToClipboard, projectId }) => {
-  // Estados de la VM unificados para mayor claridad
+  // Estados de la VM unificados
   const isRunning = vm.status === VMStatus.RUNNING || vm.status === 'CORRER';
   const isStopped = vm.status === VMStatus.STOPPED || vm.status === 'FINALIZADO' || vm.status === 'TERMINATED' || vm.status === 'PARADA';
   const isTransitioning = vm.status === 'PROVISIONING' || vm.status === 'SUSPENDING' || vm.status === 'STAGING';
@@ -73,22 +71,21 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
   // Habilitación de acciones
   const canStart = isStopped && !isTransitioning;
   const canStop = isRunning && !isTransitioning;
-  // El botón de conexión principal se habilita si la VM está corriendo y no en transición, Y tiene IP externa
-  const canConnectDirectLink = isRunning && !isTransitioning && vm.externalIp; 
+  // El botón de conexión ahora solo necesita que la VM esté corriendo y no en transición (la IP externa se valida en el modal)
+  const canOpenConnectModal = isRunning && !isTransitioning; 
 
-  // Enlaces directos a Google Cloud Console
-  const sshInBrowserLink = `https://ssh.cloud.google.com/v2/ssh/projects/${projectId}/zones/${vm.zone}/instances/${vm.name}`;
-  // Este enlace lleva a la página de detalles de la VM, donde se puede "Establecer contraseña de Windows"
-  const setWindowsPasswordLink = `https://console.cloud.google.com/compute/instancesDetail/zones/${vm.zone}/instances/${vm.name}?project=${projectId}`;
+  // Enlaces directos a Google Cloud Console (se mantienen para el prop ConnectModal, no para enlaces directos en la tarjeta)
+  // const sshInBrowserLink = `https://ssh.cloud.google.com/v2/ssh/projects/${projectId}/zones/${vm.zone}/instances/${vm.name}`;
+  // const setWindowsPasswordLink = `https://console.cloud.google.com/compute/instancesDetail/zones/${vm.zone}/instances/${vm.name}?project=${projectId}`;
 
-  // Detección de VM Windows (asumimos que el backend ya lo envía correctamente)
+  // Detección de VM Windows
   const isWindowsVM = vm.osType === 'Windows'; 
 
   // Función para obtener clases de los botones de Encender/Apagar
   const getActionButtonClass = (isEnabled: boolean, baseColor: string) => 
     `flex-1 inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white transition-colors duration-200 
     ${isEnabled ? `bg-${baseColor}-500 hover:bg-${baseColor}-600 focus:ring-${baseColor}-500` : 'bg-gray-300 text-gray-500 cursor-not-allowed'} 
-    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-50`; // Eliminado disabled:opacity-50, ya lo controla el cursor-not-allowed
+    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-50`; 
 
   // Determinar el texto para el botón deshabilitado (estado de transición o final no accionable)
   const getDisabledButtonText = () => {
@@ -97,7 +94,7 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
     if (vm.status === 'STAGING') return 'Preparando...';
     if (vm.status === VMStatus.TERMINATED || vm.status === 'FINALIZADO') return 'Terminada';
     if (vm.status === 'PARADA') return 'Parada';
-    return vm.status; // Fallback para otros estados
+    return vm.status; 
   };
 
   return (
@@ -107,14 +104,14 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
       <div className="p-5 border-b border-gray-200">
         <div className="flex justify-between items-center relative"> 
           <h3 className="text-xl font-bold text-gray-800 truncate" title={vm.name}>{vm.name}</h3>
-          {/* Botón de "Más opciones de conexión" (TerminalIcon) - Siempre visible si no está en transición */}
+          {/* Botón de "Más opciones de conexión" (TerminalIcon) - Abre el ConnectModal unificado */}
           {!isTransitioning && ( 
             <button 
-              onClick={() => onConnect(vm)} // Este botón abre el ConnectModal unificado
+              onClick={() => onConnect(vm)} // ESTE BOTÓN YA LLEVA AL MODAL
               className="ml-2 p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400"
               title="Más opciones de conexión"
             >
-              <TerminalIcon className="h-6 w-6" /> {/* Icono de terminal */}
+              <TerminalIcon className="h-6 w-6" /> 
             </button>
           )}
         </div>
@@ -187,47 +184,27 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
             Apagar
           </button>
           
-          {/* Botón de Conexión Directa a Consola (SSH para Linux, RDP para Windows) */}
-          {isWindowsVM ? (
-            <a 
-              href={setWindowsPasswordLink} 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              // ESTILOS MEJORADOS PARA EL BOTÓN DE CONEXIÓN
-              className={`flex-1 inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm transition-colors duration-200
-                ${canConnectDirectLink 
-                  ? 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500' // Azul brillante para activo
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed' // Gris claro para deshabilitado
-                } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-50`}
-              onClick={(e) => { if (!canConnectDirectLink) e.preventDefault(); }} // Prevenir navegación si deshabilitado
-            >
-              <LinkIcon className="h-5 w-5 mr-1" />
-              Conectar (RDP)
-            </a>
-          ) : ( // Asumiendo que es Linux o desconocido, ofrecemos SSH por defecto aquí
-            <a 
-              href={sshInBrowserLink} 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              // ESTILOS MEJORADOS PARA EL BOTÓN DE CONEXIÓN (SSH)
-              className={`flex-1 inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm transition-colors duration-200
-                ${canConnectDirectLink 
-                  ? 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500' // Azul brillante para activo
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed' // Gris claro para deshabilitado
-                } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-50`}
-              onClick={(e) => { if (!canConnectDirectLink) e.preventDefault(); }}
-            >
-              <LinkIcon className="h-5 w-5 mr-1" />
-              Conectar (SSH)
-            </a>
-          )}
+          {/* BOTÓN CONECTAR - AHORA SIEMPRE ABRE EL MODAL */}
+          <button 
+            onClick={() => onConnect(vm)} // Llama a onConnect para abrir el modal
+            disabled={!canOpenConnectModal} // Habilita/deshabilita el botón según si se puede conectar
+            className={`flex-1 inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm transition-colors duration-200
+              ${canOpenConnectModal 
+                ? 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500' // Estilo activo
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed' // Estilo deshabilitado
+              } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-50`}
+            title={canOpenConnectModal ? "Conectar a la máquina virtual" : "La VM debe estar en estado RUNNING para conectar"}
+          >
+            <LinkIcon className="h-5 w-5 mr-1" />
+            Conectar
+          </button>
         </div>
 
-        {/* Botón de estado deshabilitado (si la VM está en transición) - Esto ahora es un div para mensajes */}
+        {/* Botón de estado deshabilitado (si la VM está en transición) */}
         { isTransitioning && ( 
           <div className="flex space-x-2 mt-2 w-full"> 
               <div
-              className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-gray-200 cursor-not-allowed" // Mejorar el color del texto a gray-700
+              className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-gray-200 cursor-not-allowed" 
               >
               {getDisabledButtonText()}
               </div>
