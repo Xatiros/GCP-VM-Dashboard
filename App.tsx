@@ -263,12 +263,46 @@ const App: React.FC = () => {
   }, [vms]);
 
   const filteredVMs = useMemo(() => {
-    return vms.filter(vm => {
-      const nameMatch = vm.name.toLowerCase().includes(searchTerm.toLowerCase());
-      const statusMatch = statusFilter === 'ALL' || vm.status === statusFilter;
-      const zoneMatch = zoneFilter === 'ALL' || vm.zone === zoneFilter;
-      return nameMatch && statusMatch && zoneMatch;
-    });
+    return vms
+      .filter(vm => {
+        const nameMatch = vm.name.toLowerCase().includes(searchTerm.toLowerCase());
+        const statusMatch = statusFilter === 'ALL' || vm.status === statusFilter;
+        const zoneMatch = zoneFilter === 'ALL' || vm.zone === zoneFilter;
+        return nameMatch && statusMatch && zoneMatch;
+      })
+      // <--- AÑADIR LÓGICA DE ORDENAMIENTO AQUÍ
+      .sort((a, b) => {
+        // Para ordenar alfanuméricamente por nombre (ej. pepi1, pepi2, pepi4)
+        // Esto manejará números dentro de los nombres también
+        const nameA = a.name.toLowerCase();
+        const nameB = b.name.toLowerCase();
+
+        // Implementación de ordenamiento natural (maneja números correctamente)
+        const partsA = nameA.split(/(\d+)/).filter(Boolean); // Divide por dígitos
+        const partsB = nameB.split(/(\d+)/).filter(Boolean);
+
+        for (let i = 0; i < Math.min(partsA.length, partsB.length); i++) {
+          const partA = partsA[i];
+          const partB = partsB[i];
+
+          const isNumA = !isNaN(Number(partA));
+          const isNumB = !isNaN(Number(partB));
+
+          if (isNumA && isNumB) {
+            const numA = Number(partA);
+            const numB = Number(partB);
+            if (numA !== numB) {
+              return numA - numB;
+            }
+          } else {
+            if (partA < partB) return -1;
+            if (partA > partB) return 1;
+          }
+        }
+        return partsA.length - partsB.length; // Si son iguales hasta aquí, el más corto va primero
+      });
+      // <--- FIN LÓGICA DE ORDENAMIENTO
+
   }, [vms, searchTerm, statusFilter, zoneFilter]);
 
   if (!appToken) { 
