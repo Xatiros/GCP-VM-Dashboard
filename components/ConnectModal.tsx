@@ -94,7 +94,7 @@ use multimon:i:0
         <div className={`grid ${isWindowsVM ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'} gap-6 text-sm`}>
           {/* Columna principal de conexión */}
           <div className="space-y-4">
-            <h4 className="font-bold text-gray-800 border-b pb-2 mb-2">Conexión Principal</h4>
+            <h4 className="font-bold text-gray-800 border-b pb-2 mb-2">Instrucciones</h4>
             
             {isLinuxVM && ( // Opciones para Linux
               <div>
