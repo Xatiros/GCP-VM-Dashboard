@@ -74,6 +74,10 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
   // El botón de conexión ahora solo necesita que la VM esté corriendo y no en transición (la IP externa se valida en el modal)
   const canOpenConnectModal = isRunning && !isTransitioning; 
 
+  // Enlaces directos a Google Cloud Console (se mantienen para el prop ConnectModal, no para enlaces directos en la tarjeta)
+  // const sshInBrowserLink = `https://ssh.cloud.google.com/v2/ssh/projects/${projectId}/zones/${vm.zone}/instances/${vm.name}`;
+  // const setWindowsPasswordLink = `https://console.cloud.google.com/compute/instancesDetail/zones/${vm.zone}/instances/${vm.name}?project=${projectId}`;
+
   // Detección de VM Windows
   const isWindowsVM = vm.osType === 'Windows'; 
 
@@ -210,6 +214,3 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
     </div>
   );
 };
-
-
-

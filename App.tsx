@@ -7,14 +7,15 @@ import { Spinner } from './components/Spinner';
 import { Toast } from './components/Toast';
 import { VirtualMachine, VMStatus, GCPProject } from './types';
 import { fetchVMs as apiFetchVMs, startVM as apiStartVM, stopVM as apiStopVM } from './services/vmService';
-import { RefreshIcon, SearchIcon, CogIcon } from './components/icons'; // Asegúrate de que CogIcon está importado para el spinner
+import { RefreshIcon, SearchIcon, CogIcon } from './components/icons';
 import { AuthButton } from './components/AuthButton';
 
 // Define la URL de autenticación del backend
 const BACKEND_AUTH_ENDPOINT_URL = process.env.VITE_APP_BACKEND_AUTH_URL || 'http://localhost:3001/api/auth/google';
 
 // Configuración del polling
-const POLLING_INTERVAL_MS = 5000;// 5 segundos para la actualización automática
+const GLOBAL_POLLING_INTERVAL_MS = 30000; // Polling global más lento: 30 segundos
+const TRANSITION_POLLING_INTERVAL_MS = 5000; // Polling rápido para VMs en transición: 5 segundos
 
 const App: React.FC = () => {
   const [vms, setVms] = useState<VirtualMachine[]>([]);
@@ -28,8 +29,9 @@ const App: React.FC = () => {
   const [selectedVMForConnect, setSelectedVMForConnect] = useState<VirtualMachine | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Ya tienes los pollingTimers, pero para el polling global usaremos el useEffect principal
-  // const pollingTimers = useRef<{ [key: string]: NodeJS.Timeout }>({});
+  // --- Manejo de Polling Individual para Transiciones ---
+  const transitionPollingTimers = useRef<{ [vmId: string]: NodeJS.Timeout }>({}); // Usa un nombre más específico
+  // --- FIN Manejo de Polling Individual ---
 
   // --- ESTADO DE AUTENTICACIÓN ---
   const [appToken, setAppToken] = useState<string | null>(localStorage.getItem('appToken'));
@@ -58,19 +60,31 @@ const App: React.FC = () => {
     setError(null);
     try {
       if (!selectedProject || !selectedProject.id || !appToken) { 
-        // Si no hay token, no intentes cargar, pero no lo trates como un error de API
-        // El useEffect de autenticación ya manejará esto.
         setIsLoading(false);
         return;
       }
       const fetchedVMs = await apiFetchVMs(selectedProject.id, appToken); 
       setVms(fetchedVMs);
+
+      // Después de cargar las VMs, activa/desactiva los pollings individuales
+      fetchedVMs.forEach(vm => {
+        const isTransitioningState = vm.status === 'PROVISIONING' || vm.status === 'STAGING' || vm.status === 'SUSPENDING';
+        if (isTransitioningState && !transitionPollingTimers.current[vm.id]) {
+            console.log(`[Polling] Iniciando polling rápido para VM en transición: ${vm.name} (${vm.status})`);
+            startTransitionPolling(vm.id); // Inicia el polling rápido si es necesario
+        } else if (!isTransitioningState && transitionPollingTimers.current[vm.id]) {
+            console.log(`[Polling] Deteniendo polling rápido para VM: ${vm.name} (${vm.status})`);
+            clearTimeout(transitionPollingTimers.current[vm.id]);
+            delete transitionPollingTimers.current[vm.id];
+            showToast(`VM '${vm.name}' ahora en estado: ${vm.status}`); // Notificación cuando termina transición
+        }
+      });
+
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido al cargar VMs.';
       setError(`No se pudieron cargar las máquinas virtuales: ${errorMessage}. Inténtalo de nuevo.`);
       console.error("Error al cargar VMs en el frontend:", err);
       showToast('Error al cargar VMs.');
-      // Si el error es de autenticación/autorización, forzar logout
       if (errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('No autorizado') || errorMessage.includes('sesión expirada')) {
         showToast("Sesión expirada o no autorizada. Por favor, inicie sesión de nuevo.");
         handleLogout();
@@ -80,63 +94,52 @@ const App: React.FC = () => {
     }
   }, [selectedProject, appToken]); // Depende de selectedProject y appToken
 
-  // Polling general de la lista de VMs
+  // Función para iniciar el polling rápido individual de una VM
+  const startTransitionPolling = useCallback((vmId: string) => {
+    // Si ya existe un timer para esta VM, no hagas nada (o límpialo y vuelve a empezar si cambias de idea)
+    if (transitionPollingTimers.current[vmId]) {
+      return; 
+    }
+
+    const pollSingleVm = async () => {
+      // Forzar una carga global para actualizar todos los estados
+      await loadVMs(); 
+      // La lógica de detener el polling se maneja dentro de loadVMs()
+    };
+
+    // Inicia el polling y guarda la referencia
+    transitionPollingTimers.current[vmId] = setTimeout(pollSingleVm, TRANSITION_POLLING_INTERVAL_MS);
+  }, [loadVMs]);
+
+
+  // Efecto para el polling GLOBAL
   useEffect(() => {
     if (appToken) { 
-      loadVMs(); // Carga inicial
-      showToast(`Actualizando VMs cada ${POLLING_INTERVAL_MS / 1000} segundos.`); // Notificación de inicio de polling
-      const intervalId = setInterval(loadVMs, POLLING_INTERVAL_MS);
+      loadVMs(); // Carga inicial al obtener el token
+      showToast(`Actualización global de VMs cada ${GLOBAL_POLLING_INTERVAL_MS / 1000} segundos iniciada.`);
+      const globalIntervalId = setInterval(loadVMs, GLOBAL_POLLING_INTERVAL_MS);
       return () => {
-        clearInterval(intervalId);
-        showToast("Actualización automática de VMs detenida."); // Notificación al detener
+        clearInterval(globalIntervalId);
+        showToast("Actualización global de VMs detenida.");
       };
     } else {
-      // Si no hay token, limpiar VMs y errores para el estado de no autenticado
       setVms([]);
       setError(null);
       setIsLoading(false);
     }
-  }, [appToken, loadVMs]); // Depende de appToken y loadVMs
+  }, [appToken, loadVMs]);
 
-  // Tu lógica de polling individual (la que ya tenías)
-  const pollingTimers = useRef<{ [key: string]: NodeJS.Timeout }>({}); // Mantenemos esta referencia si es para polling post-operación
-  const startPollingVMStatus = useCallback((vmId: string, expectedFinalStatus: VMStatus) => {
-    if (pollingTimers.current[vmId]) {
-      clearTimeout(pollingTimers.current[vmId]);
-    }
-
-    const poll = async () => {
-      await loadVMs(); // Refresca la lista completa
-      const currentVm = vms.find(vm => vm.id === vmId);
-
-      const isFinalState = (status: VMStatus | string) => 
-        status === VMStatus.RUNNING || status === VMStatus.STOPPED || 
-        status === VMStatus.TERMINATED || status === 'FINALIZADO' || status === 'PARADA'; // Añadido 'PARADA'
-
-      if (currentVm && isFinalState(currentVm.status)) {
-          console.log(`Polling detenido para VM ${vmId}. Estado final alcanzado: ${currentVm.status}`);
-          delete pollingTimers.current[vmId];
-          showToast(`Estado de VM '${currentVm.name}' actualizado a ${currentVm.status}.`); // Notificación específica
-          return;
-      }
-      
-      pollingTimers.current[vmId] = setTimeout(poll, 5000); 
-    };
-
-    // Inicia el primer poll después de un pequeño retraso si la operación no es instantánea
-    // setTimeout(poll, 1000); // Esto ya se maneja con el setTimeout en handleStart/StopVM
-    poll(); // Inicia el polling inmediatamente
-  }, [loadVMs, vms]); // Depende de loadVMs y vms (para encontrar la VM actual)
-
-  // Limpiar timers individuales al desmontar
+  // Limpiar todos los timers de polling (global e individuales) al desmontar el App
   useEffect(() => {
     return () => {
-      for (const vmId in pollingTimers.current) {
-        clearTimeout(pollingTimers.current[vmId]);
+      // Limpiar el timer global ya se maneja en el useEffect anterior
+      // Limpiar timers individuales
+      for (const vmId in transitionPollingTimers.current) {
+        clearTimeout(transitionPollingTimers.current[vmId]);
+        delete transitionPollingTimers.current[vmId];
       }
     };
   }, []);
-
 
   const handleStartVM = async (vmId: string) => {
     const vmToStart = vms.find(vm => vm.id === vmId);
@@ -152,19 +155,17 @@ const App: React.FC = () => {
     try {
       const updatedVM = await apiStartVM(vmId, vmToStart.zone, selectedProject.id, appToken); 
       setVms(prevVms => prevVms.map(vm => vm.id === vmId ? updatedVM : vm));
-      // No necesitamos showToast aquí, el polling individual lo manejará al llegar a estado final
       
-      // Iniciar polling individual para esta VM específica
-      startPollingVMStatus(vmId, VMStatus.RUNNING); 
+      // Iniciar polling rápido para esta VM
+      startTransitionPolling(vmId);
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido al iniciar VM.';
       setError(`Fallo al iniciar VM '${vmToStart.name}': ${errorMessage}.`);
-      // Revertir el estado si hay un error
-      setVms(prevVms => prevVms.map(vm => vm.id === vmId ? { ...vmToStart, status: VMStatus.STOPPED } : vm)); // Revertir a STOPPED
+      setVms(prevVms => prevVms.map(vm => vm.id === vmId ? { ...vmToStart, status: VMStatus.STOPPED } : vm)); 
       showToast(`Error al iniciar VM '${vmToStart.name}'.`);
       console.error("Error al iniciar VM:", err);
-      if (errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('No autorizado') || errorMessage.includes('sesión expirada')) {
+      if (errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('sesión expirada')) {
         handleLogout();
       }
     }
@@ -183,19 +184,17 @@ const App: React.FC = () => {
     try {
       const updatedVM = await apiStopVM(vmId, vmToStop.zone, selectedProject.id, appToken); 
       setVms(prevVms => prevVms.map(vm => vm.id === vmId ? updatedVM : vm));
-      // No necesitamos showToast aquí, el polling individual lo manejará al llegar a estado final
 
-      // Iniciar polling individual para esta VM específica
-      startPollingVMStatus(vmId, VMStatus.STOPPED); 
+      // Iniciar polling rápido para esta VM
+      startTransitionPolling(vmId);
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido al detener VM.';
       setError(`Fallo al detener VM '${vmToStop.name}': ${errorMessage}.`);
-      // Revertir el estado si hay un error
-      setVms(prevVms => prevVms.map(vm => vm.id === vmId ? { ...vmToStop, status: VMStatus.RUNNING } : vm)); // Revertir a RUNNING
+      setVms(prevVms => prevVms.map(vm => vm.id === vmId ? { ...vmToStop, status: VMStatus.RUNNING } : vm)); 
       showToast(`Error al detener VM '${vmToStop.name}'.`);
       console.error("Error al detener VM:", err);
-      if (errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('No autorizado') || errorMessage.includes('sesión expirada')) {
+      if (errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('sesión expirada')) {
         handleLogout();
       }
     }
@@ -272,7 +271,6 @@ const App: React.FC = () => {
     });
   }, [vms, searchTerm, statusFilter, zoneFilter]);
 
-  // --- Lógica de renderizado condicional basada en autenticación ---
   if (!appToken) { 
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -292,13 +290,11 @@ const App: React.FC = () => {
       </div>
     );
   }
-  // --- FIN Lógica de renderizado condicional ---
-
 
   return (
     <div className="min-h-screen flex flex-col">
       <Header 
-        appName="Cloud VM Manager" 
+        appName="Cloud VM Manager" {/* ¡Ya actualizado! */}
         projects={ALL_PROJECTS}
         selectedProject={selectedProject}
         onProjectChange={setSelectedProject}
@@ -360,9 +356,8 @@ const App: React.FC = () => {
               </div>
               <div className="mt-4 md:mt-0 md:col-start-2 lg:col-start-auto">
                    <button
-                     onClick={loadVMs} // Este botón ahora llama a la misma función que el polling
+                     onClick={loadVMs} 
                      disabled={isLoading}
-                     // Usar un color base que sea siempre visible
                      className="w-full flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:opacity-50"
                    >
                      <RefreshIcon className={`h-5 w-5 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
@@ -395,16 +390,15 @@ const App: React.FC = () => {
           {!isLoading && !error && filteredVMs.length > 0 && (
             <VMList
               vms={filteredVMs}
-              onStart={handleStartVM}
-              onStop={handleStopVM}
-              onConnect={handleConnectVM} // Esto abrirá el ConnectModal (ahora el modal unificado)
+              onStartVM={handleStartVM} // NOMBRES DE PROP COINCIDEN CON VMCard.tsx
+              onStopVM={handleStopVM}   // NOMBRES DE PROP COINCIDEN CON VMCard.tsx
+              onConnectVM={handleConnectVM} 
               onCopyToClipboard={handleCopyToClipboard}
-              projectId={selectedProject.id} // Pasar el projectId a VMList
+              projectId={selectedProject.id} 
             />
           )}
         </div>
       </main>
-      {/* El ConnectModal se abre aquí. selectedVMForConnect lo controla. */}
       {selectedVMForConnect && (
         <ConnectModal
           vm={selectedVMForConnect}
