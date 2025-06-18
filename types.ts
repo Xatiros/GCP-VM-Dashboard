@@ -18,7 +18,7 @@ export interface VirtualMachine {
   internalIp: string;
   machineType: string;
   creationTimestamp?: string; 
-  osType?: 'Linux' | 'Windows' | 'Other'; // <-- ¡NUEVA PROPIEDAD!
+  osType?: 'Linux' | 'Windows' | 'Other'; 
 }
 
 export interface GCPProject {
