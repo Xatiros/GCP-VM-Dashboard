@@ -1,4 +1,4 @@
-// src/components/VMList.tsx (solo la parte relevante)
+// src/components/VMList.tsx
 
 import React from 'react';
 import { VirtualMachine } from '../types';
@@ -10,7 +10,7 @@ interface VMListProps {
   onStopVM: (vmId:string) => void;
   onConnectVM: (vm: VirtualMachine) => void;
   onCopyToClipboard: (text: string, type: string) => void;
-  projectId: string; // ¡NUEVA PROP!
+  projectId: string; 
 }
 
 export const VMList: React.FC<VMListProps> = ({ vms, onStartVM, onStopVM, onConnectVM, onCopyToClipboard, projectId }) => {
@@ -29,11 +29,12 @@ export const VMList: React.FC<VMListProps> = ({ vms, onStartVM, onStopVM, onConn
         <VMCard 
             key={vm.id} 
             vm={vm} 
-            onStart={() => onStartVM(vm.id)}
-            onStop={() => onStopVM(vm.id)}
-            onConnect={onConnectVM} // onConnect ya recibe la VM completa
+            // ¡¡¡CAMBIO AQUÍ: Coincidir nombres de props con VMCard.tsx!!!
+            onStartVM={() => onStartVM(vm.id)}   // <-- Ahora se pasa como onStartVM
+            onStopVM={() => onStopVM(vm.id)}     // <-- Ahora se pasa como onStopVM
+            onConnectVM={onConnectVM}            // <-- Ahora se pasa como onConnectVM
             onCopyToClipboard={onCopyToClipboard}
-            projectId={projectId} // ¡PASAR LA PROP A VMCard!
+            projectId={projectId} 
         />
       ))}
     </div>
