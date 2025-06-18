@@ -5,12 +5,13 @@ const dotenv = require('dotenv');
 const { OAuth2Client } = require('google-auth-library');
 const jwt = require('jsonwebtoken');
 
-const computePackage = require('@google-cloud/compute'); // Asegúrate de que esta importación sea correcta
+const computePackage = require('@google-cloud/compute');
 
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 8080;
+// Cloud Run inyecta la variable PORT, usarla si está disponible, sino 8080 como fallback.
+const port = process.env.PORT || 8080; 
 
 // --- CONFIGURACIÓN DE AUTENTICACIÓN ---
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID; 
@@ -52,77 +53,72 @@ app.get('/', (req, res) => {
 let instancesClient;
 let zonesClient;
 let globalOperationsClient;
-let imagesClient; // <--- REINTRODUCIMOS EL CLIENTE DE IMÁGENES
+let imagesClient; 
 
 const GCP_PROJECT_ID = process.env.GCP_PROJECT_ID; 
 
+// Validar que el PROJECT_ID esté definido, es crítico para la inicialización
 if (!GCP_PROJECT_ID) {
-    console.error("Error fatal: La variable de entorno GCP_PROJECT_ID no está definida.");
-    process.exit(1);
+    console.error("Error fatal: La variable de entorno GCP_PROJECT_ID no está definida. La aplicación no puede iniciarse.");
+    // No salimos de process aquí, ya que en Cloud Run preferimos que falle el contenedor y los logs lo muestren.
+    // throw new Error("GCP_PROJECT_ID no está definida.");
 }
 
+// Inicialización de clientes de Compute Engine
+// Usamos bloques try/catch para cada cliente para registrar errores específicos al inicio
 try {
   if (computePackage.v1 && computePackage.v1.InstancesClient && typeof computePackage.v1.InstancesClient === 'function') {
     instancesClient = new computePackage.v1.InstancesClient({ projectId: GCP_PROJECT_ID });
-    console.log("Cliente de Instancias (para start/stop/list) inicializado con: new v1.InstancesClient()");
+    console.log("Cliente de Instancias (para start/stop/list) inicializado.");
   } else {
     throw new Error("No se encontró el constructor InstancesClient en computePackage.v1.");
   }
 } catch (e) {
-  console.error("Error fatal al inicializar Cliente de Instancias (para start/stop/list):", e.message);
-  process.exit(1);
+  console.error("Error fatal al inicializar Cliente de Instancias:", e.message);
+  // Un error aquí podría impedir que el servidor escuche, pero la traza detallada en logs es lo importante
 }
 
 try {
   if (computePackage.v1 && computePackage.v1.ZonesClient && typeof computePackage.v1.ZonesClient === 'function') {
     zonesClient = new computePackage.v1.ZonesClient({ projectId: GCP_PROJECT_ID });
-    console.log("Cliente de Zonas inicializado con: new v1.ZonesClient()");
+    console.log("Cliente de Zonas inicializado.");
   } else {
     throw new Error("No se encontró el constructor ZonesClient en computePackage.v1.");
   }
 } catch (e) {
   console.error("Error fatal al inicializar Cliente de Zonas:", e.message);
-  process.exit(1);
 }
 
 try {
   if (computePackage.v1 && computePackage.v1.GlobalOperationsClient && typeof computePackage.v1.GlobalOperationsClient === 'function') {
     globalOperationsClient = new computePackage.v1.GlobalOperationsClient({ projectId: GCP_PROJECT_ID });
-    console.log("Cliente de Operaciones Globales inicializado con: new v1.GlobalOperationsClient()");
+    console.log("Cliente de Operaciones Globales inicializado.");
   } else {
     throw new Error("No se encontró el constructor GlobalOperationsClient en computePackage.v1.");
   }
 } catch (e) {
   console.error("Error fatal al inicializar Cliente de Operaciones Globales:", e.message);
-  process.exit(1);
 }
 
-// <--- INICIALIZAR IMAGES CLIENT DE NUEVO
 try {
   if (computePackage.v1 && computePackage.v1.ImagesClient && typeof computePackage.v1.ImagesClient === 'function') {
     imagesClient = new computePackage.v1.ImagesClient({ projectId: GCP_PROJECT_ID });
-    console.log("Cliente de Imágenes inicializado con: new v1.ImagesClient()");
+    console.log("Cliente de Imágenes inicializado.");
   } else {
     throw new Error("No se encontró el constructor ImagesClient en computePackage.v1.");
   }
 } catch (e) {
   console.error("Error fatal al inicializar Cliente de Imágenes:", e.message);
-  process.exit(1);
 }
-// FIN INICIALIZACIÓN IMAGES CLIENT
 
+// Logs de estado de inicialización
 console.log("\n--- Estado de los clientes de Compute después de la inicialización ---");
-console.log("instancesClient:", instancesClient ? 'Inicializado' : 'ERROR');
-console.log("instancesClient.list (si existe):", typeof instancesClient.list === 'function' ? 'Function' : 'Undefined/Not a function');
-console.log("instancesClient.start (si existe):", typeof instancesClient.start === 'function' ? 'Function' : 'Undefined/Not a function');
-console.log("instancesClient.stop (si existe):", typeof instancesClient.stop === 'function' ? 'Function' : 'Undefined/Not a function');
-console.log("zonesClient:", zonesClient ? 'Inicializado' : 'ERROR');
-console.log("zonesClient.list (si existe):", typeof zonesClient.list === 'function' ? 'Function' : 'Undefined/Not a function');
-console.log("globalOperationsClient:", globalOperationsClient ? 'Inicializado' : 'ERROR');
-console.log("globalOperationsClient.wait (si existe):", typeof globalOperationsClient.wait === 'function' ? 'Function' : 'Undefined/Not a function');
-console.log("imagesClient:", imagesClient ? 'Inicializado' : 'ERROR'); // <--- Añadir log para ImagesClient
-console.log("imagesClient.get (si existe):", typeof imagesClient.get === 'function' ? 'Function' : 'Undefined/Not a function'); // <--- Añadir log
+console.log("instancesClient:", instancesClient ? 'Inicializado' : 'ERROR - No inicializado');
+console.log("zonesClient:", zonesClient ? 'Inicializado' : 'ERROR - No inicializado');
+console.log("globalOperationsClient:", globalOperationsClient ? 'Inicializado' : 'ERROR - No inicializado');
+console.log("imagesClient:", imagesClient ? 'Inicializado' : 'ERROR - No inicializado');
 console.log("----------------------------------------------------------\n");
+
 
 /**
  * Intenta determinar el tipo de sistema operativo de una VM basada en su disco de arranque y metadatos de la imagen.
@@ -131,93 +127,87 @@ console.log("----------------------------------------------------------\n");
  */
 async function getVmOsType(vm) {
   if (!imagesClient || typeof imagesClient.get !== 'function') {
-    console.warn("Advertencia: imagesClient no está inicializado. No se puede determinar el tipo de SO.");
+    console.warn("[getVmOsType] Advertencia: imagesClient no está inicializado. No se puede determinar el tipo de SO. Devolviendo 'Unknown'.");
     return 'Unknown';
   }
 
+  // Verificar si hay discos y si el primero es un disco de arranque
   if (vm.disks && vm.disks.length > 0 && vm.disks[0].boot) {
     const bootDisk = vm.disks[0];
     const sourceImageLink = bootDisk.initializeParams?.sourceImage;
 
-    console.log(`[DEBUG SO] VM: ${vm.name}, SourceImageLink: ${sourceImageLink}`); // Log la URL original
+    console.log(`[getVmOsType] VM: ${vm.name}, SourceImageLink: ${sourceImageLink}`); 
     
     if (sourceImageLink) {
       try {
         const urlParts = sourceImageLink.split('/');
-        const imageIdIndex = urlParts.indexOf('images') + 1; // Debería apuntar al nombre o 'family'
+        let imageProject = GCP_PROJECT_ID; // Asumir el proyecto actual como fallback robusto
 
-        let imageProject = 'google'; // Asumir 'google' para imágenes públicas por defecto
+        // Intentar extraer el project ID de la URL
         // La URL de la imagen podría ser: projects/{project}/global/images/{image_name}
         // O: https://www.googleapis.com/compute/v1/projects/{project}/global/images/{image_name}
-        // O: projects/{project}/global/images/family/{family_name}
-        
-        // Extraer el project ID de la URL
-        const projectIndex = urlParts.indexOf('projects');
-        if (projectIndex !== -1 && projectIndex + 1 < urlParts.length) {
-            imageProject = urlParts[projectIndex + 1];
+        const projectsKeywordIndex = urlParts.indexOf('projects');
+        if (projectsKeywordIndex !== -1 && projectsKeywordIndex + 1 < urlParts.length) {
+            imageProject = urlParts[projectsKeywordIndex + 1];
         } else {
-            // Si no encuentra 'projects/' en la URL, podría ser una imagen de proyecto actual o de un proyecto 'por defecto'
-            // Podríamos intentar usar GCP_PROJECT_ID o un proyecto común como 'debian-cloud', 'windows-cloud'
-            // Esto es un fallback, y puede que no sea robusto.
-            console.warn(`[DEBUG SO] No se pudo extraer project ID de la URL de la imagen: ${sourceImageLink}. Usando el Project ID por defecto de la app: ${GCP_PROJECT_ID}.`);
-            imageProject = GCP_PROJECT_ID; // Fallback al Project ID de tu aplicación
+            console.warn(`[getVmOsType] No se pudo extraer project ID de la URL de la imagen: ${sourceImageLink}. Usando el Project ID de la aplicación: ${GCP_PROJECT_ID}.`);
         }
 
-        let imageNameOrFamily = urlParts[imageIdIndex]; // Nombre de la imagen o 'family'
-        if (imageNameOrFamily === 'family' && imageIdIndex + 1 < urlParts.length) {
-            imageNameOrFamily = urlParts[imageIdIndex + 1]; // Obtener el nombre de la familia si es una familia
-        } else if (imageIdIndex >= urlParts.length) { // Si 'images' es lo último, hay un problema en la URL
-            throw new Error("URL de imagen incompleta o mal formada.");
+        const imagesKeywordIndex = urlParts.indexOf('images');
+        let imageNameOrFamily = '';
+
+        if (imagesKeywordIndex !== -1 && imagesKeywordIndex + 1 < urlParts.length) {
+            imageNameOrFamily = urlParts[imagesKeywordIndex + 1];
+            if (imageNameOrFamily === 'family' && imagesKeywordIndex + 2 < urlParts.length) {
+                imageNameOrFamily = urlParts[imagesKeywordIndex + 2]; // Obtener el nombre de la familia
+            }
+        } else {
+            throw new Error(`URL de imagen incompleta o mal formada: ${sourceImageLink}.`);
+        }
+        
+        if (!imageNameOrFamily) {
+             throw new Error(`No se pudo extraer el nombre o la familia de la imagen de la URL: ${sourceImageLink}.`);
         }
 
-        console.log(`[DEBUG SO] VM: ${vm.name}, Intentando imagesClient.get con project: '${imageProject}', image: '${imageNameOrFamily}'`); // Log los parámetros de la llamada a la API
+
+        console.log(`[getVmOsType] VM: ${vm.name}, Intentando imagesClient.get con project: '${imageProject}', image: '${imageNameOrFamily}'`);
         
         const [image] = await imagesClient.get({
           project: imageProject, 
           image: imageNameOrFamily, 
         });
 
-        // <--- AÑADIR ESTOS LOGS PARA VER LOS METADATOS OBTENIDOS
-        console.log(`[DEBUG SO] VM: ${vm.name}, Imagen obtenida: name='${image.name}', family='${image.family}', description='${image.description}'`);
-        // FIN LOGS METADATOS
+        console.log(`[getVmOsType] VM: ${vm.name}, Imagen obtenida: name='${image.name}', family='${image.family || 'N/A'}', description='${image.description || 'N/A'}'`);
 
         const imageDescription = image.description ? image.description.toLowerCase() : '';
         const imageFamily = image.family ? image.family.toLowerCase() : '';
         const imageName = image.name ? image.name.toLowerCase() : '';
         
         if (imageDescription.includes('windows') || imageFamily.includes('windows') || imageName.includes('windows')) {
-          console.log(`[BACKEND] VM: ${vm.name}, SO detectado: Windows (desde imagen: ${imageNameOrFamily})`);
+          console.log(`[getVmOsType] VM: ${vm.name}, SO detectado: Windows (desde imagen: ${imageNameOrFamily})`);
           return 'Windows';
         } else if (imageDescription.includes('linux') || imageFamily.includes('linux') || imageName.includes('linux') ||
                    imageDescription.includes('debian') || imageFamily.includes('debian') || imageName.includes('debian') ||
                    imageDescription.includes('ubuntu') || imageFamily.includes('ubuntu') || imageName.includes('ubuntu') ||
                    imageDescription.includes('centos') || imageFamily.includes('centos') || imageName.includes('centos') ||
-                   imageDescription.includes('rhel') || imageFamily.includes('rhel') || imageName.includes('rhel')) {
-          console.log(`[BACKEND] VM: ${vm.name}, SO detectado: Linux (desde imagen: ${imageNameOrFamily})`);
+                   imageDescription.includes('rhel') || imageFamily.includes('rhel') || imageName.includes('rhel') ||
+                   imageDescription.includes('sles') || imageFamily.includes('sles') || imageName.includes('sles') ||
+                   imageDescription.includes('coreos') || imageFamily.includes('coreos') || imageName.includes('coreos') ||
+                   imageDescription.includes('fedora') || imageFamily.includes('fedora') || imageName.includes('fedora')) {
+          console.log(`[getVmOsType] VM: ${vm.name}, SO detectado: Linux (desde imagen: ${imageNameOrFamily})`);
           return 'Linux';
         }
       } catch (imageError) {
-        console.warn(`[BACKEND] Error al intentar obtener detalles de imagen para VM ${vm.name} con SourceImageLink ${sourceImageLink}:`, imageError.message);
+        console.warn(`[getVmOsType] Error al obtener detalles de imagen para VM ${vm.name} con SourceImageLink ${sourceImageLink}: ${imageError.message}`);
         // Fallback: intentar inferir del nombre de la URL si imagesClient.get falló
         const nameFromUrl = sourceImageLink.split('/').pop().toLowerCase();
-        console.log(`[DEBUG SO] VM: ${vm.name}, Fallback de detección por nombre de URL: '${nameFromUrl}'`);
+        console.log(`[getVmOsType] VM: ${vm.name}, Fallback de detección por nombre de URL: '${nameFromUrl}'`);
         if (nameFromUrl.includes('windows')) return 'Windows';
         if (nameFromUrl.includes('linux') || nameFromUrl.includes('debian') || nameFromUrl.includes('ubuntu')) return 'Linux';
       }
     }
   }
-  console.log(`[BACKEND] VM: ${vm.name}, No se pudo determinar el SO. Devolviendo 'Unknown'.`);
-  return 'Unknown';
-}      } catch (imageError) {
-        console.warn(`[BACKEND] Error al intentar determinar el SO para VM ${vm.name} desde la imagen ${sourceImageLink}:`, imageError.message);
-        // Si falla la obtención de la imagen, intentamos inferir del nombre de la URL como fallback
-        const nameFromUrl = sourceImageLink.split('/').pop().toLowerCase();
-        if (nameFromUrl.includes('windows')) return 'Windows';
-        if (nameFromUrl.includes('linux') || nameFromUrl.includes('debian') || nameFromUrl.includes('ubuntu')) return 'Linux';
-      }
-    }
-  }
-  console.log(`[BACKEND] VM: ${vm.name}, No se pudo determinar el SO. Devolviendo 'Unknown'.`);
+  console.log(`[getVmOsType] VM: ${vm.name}, No se pudo determinar el SO. Devolviendo 'Unknown'.`);
   return 'Unknown';
 }
 
@@ -294,9 +284,6 @@ app.get('/api/vms/:projectId', authenticateToken, async (req, res) => {
     console.log(`[BACKEND] Se encontraron ${vms.length} VMs en las zonas europeas de GCP.`);
 
     const mappedVms = await Promise.all(vms.map(async (vm) => { 
-      // Si la VM no está en RUNNING o STAGING, y ya tiene un osType, podemos reutilizarlo para evitar llamadas innecesarias
-      // Esto es una optimización, pero puede que prefieras siempre detectarlo si es crítico.
-      // Por ahora, siempre se intentará detectar para asegurar la precisión.
       const osType = await getVmOsType(vm); 
       return {
         id: vm.id,
@@ -366,7 +353,7 @@ app.post('/api/vms/start/:vmId', authenticateToken, async (req, res) => {
         statusToReturn = 'RUNNING';
     }
 
-    const osType = await getVmOsType(updatedVm); // Detectar SO al actualizar
+    const osType = await getVmOsType(updatedVm); 
     console.log(`[BACKEND] VM ${vmId} iniciada. Estado actualizado (antes de mapear): ${actualStatusFromGCP}. Estado final devuelto: ${statusToReturn}. SO: ${osType}`);
 
     const mappedVm = {
@@ -435,7 +422,7 @@ app.post('/api/vms/stop/:vmId', authenticateToken, async (req, res) => {
         }
     }
 
-    const osType = await getVmOsType(updatedVm); // Detectar SO al actualizar
+    const osType = await getVmOsType(updatedVm); 
     console.log(`[BACKEND] VM ${vmId} detenida. Estado actualizado (antes de mapear): ${actualStatusFromGCP}. Estado final devuelto: ${statusToReturn}. SO: ${osType}`);
 
     const mappedVm = {
