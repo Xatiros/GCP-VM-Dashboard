@@ -71,6 +71,7 @@ let instancesClient;
 let zonesClient;
 let globalOperationsClient;
 let imagesClient; 
+let disksClient; // <-- DECLARAR disksClient AQUI
 
 // Inicialización de clientes de Compute Engine
 try {
@@ -117,12 +118,27 @@ try {
   console.error("Error fatal al inicializar Cliente de Imágenes:", e.message);
 }
 
+// <-- INICIALIZAR disksClient AQUI -->
+try {
+  if (computePackage.v1 && computePackage.v1.DisksClient && typeof computePackage.v1.DisksClient === 'function') {
+    disksClient = new computePackage.v1.DisksClient({ projectId: GCP_PROJECT_ID });
+    console.log("Cliente de Discos inicializado.");
+  } else {
+    throw new Error("No se encontró el constructor DisksClient en computePackage.v1.");
+  }
+} catch (e) {
+  console.error("Error fatal al inicializar Cliente de Discos:", e.message);
+}
+// <-- FIN INICIALIZAR disksClient -->
+
+
 // Logs de estado de inicialización
 console.log("\n--- Estado de los clientes de Compute después de la inicialización ---");
 console.log("instancesClient:", instancesClient ? 'Inicializado' : 'ERROR - No inicializado');
 console.log("zonesClient:", zonesClient ? 'Inicializado' : 'ERROR - No inicializado');
 console.log("globalOperationsClient:", globalOperationsClient ? 'Inicializado' : 'ERROR - No inicializado');
 console.log("imagesClient:", imagesClient ? 'Inicializado' : 'ERROR - No inicializado');
+console.log("disksClient:", disksClient ? 'Inicializado' : 'ERROR - No inicializado'); // <-- AÑADIR A LOGS
 console.log("----------------------------------------------------------\n");
 
 
@@ -132,108 +148,178 @@ console.log("----------------------------------------------------------\n");
  * @returns {Promise<string>} 'Windows', 'Linux', o 'Unknown'.
  */
 async function getVmOsType(vm) {
-  if (!imagesClient || typeof imagesClient.get !== 'function') {
-    console.warn("[getVmOsType] Advertencia: imagesClient no está inicializado. No se puede determinar el tipo de SO. Devolviendo 'Unknown'.");
+  // Asegurarse de que los clientes necesarios están inicializados
+  if (!imagesClient || typeof imagesClient.get !== 'function' || !disksClient || typeof disksClient.get !== 'function') {
+    console.warn("[getVmOsType] Advertencia: Clientes de imágenes o discos no están inicializados. No se puede determinar el tipo de SO. Devolviendo 'Unknown'.");
     return 'Unknown';
   }
 
+  // Verificar si la VM tiene discos y si el primer disco es de arranque
   if (vm.disks && vm.disks.length > 0 && vm.disks[0].boot) {
     const bootDisk = vm.disks[0];
     
     console.log(`[DEBUG DISKS] VM: ${vm.name}, bootDisk content: ${JSON.stringify(bootDisk, null, 2)}`);
 
-    // --- NUEVA LÓGICA DE DETECCIÓN DE SO PRIORITARIA ---
+    // --- ESTRATEGIA 1: Detección por guestOsFeatures y licenses (más rápido) ---
     if (bootDisk.guestOsFeatures && Array.isArray(bootDisk.guestOsFeatures)) {
         const guestFeatures = bootDisk.guestOsFeatures.map(f => f.type).filter(Boolean).map(t => t.toLowerCase());
         if (guestFeatures.includes('windows')) {
             console.log(`[getVmOsType] VM: ${vm.name}, SO detectado: Windows (desde guestOsFeatures)`);
             return 'Windows';
         }
-        // Puedes añadir más si tienes Linux y sabes qué features buscar (ej. VIRTIO_NET)
+        // No hay una feature "LINUX" directa aquí, pero si sabes de una específica, puedes añadirla.
     }
 
     if (bootDisk.licenses && Array.isArray(bootDisk.licenses)) {
-        const licenseLink = bootDisk.licenses[0]; // Asumir que la primera licencia es la más relevante
+        const licenseLink = bootDisk.licenses[0]; 
         if (licenseLink.toLowerCase().includes('windows')) {
             console.log(`[getVmOsType] VM: ${vm.name}, SO detectado: Windows (desde licenses)`);
             return 'Windows';
         }
-        // Para Linux, podrías buscar 'debian', 'ubuntu', etc. en la licencia, pero es menos común.
     }
-    // --- FIN NUEVA LÓGICA DE DETECCIÓN PRIORITARIA ---
+    // --- FIN ESTRATEGIA 1 ---
 
-    // La lógica anterior para sourceImageLink, ahora como fallback si las nuevas fallan
-    const sourceImageLink = bootDisk.sourceImage || bootDisk.initializeParams?.sourceImage;
-
-    console.log(`[getVmOsType] VM: ${vm.name}, SourceImageLink: ${sourceImageLink}`); 
+    // --- ESTRATEGIA 2: Obtener detalles del DISCO persistente (más detallado) ---
+    // La propiedad `source` del bootDisk apunta al disco persistente real.
+    // Ej: "source": "https://www.googleapis.com/compute/v1/projects/my-project/zones/us-central1-a/disks/my-disk"
+    const diskSourceLink = bootDisk.source; 
     
-    if (sourceImageLink) {
-      try {
-        const urlParts = sourceImageLink.split('/');
-        let imageProject = GCP_PROJECT_ID; 
+    if (diskSourceLink) {
+        try {
+            // Extraer project, zone y diskName del diskSourceLink
+            const diskUrlParts = diskSourceLink.split('/');
+            const diskName = diskUrlParts[diskUrlParts.length - 1];
+            const diskZone = diskUrlParts[diskUrlParts.length - 3]; 
+            const diskProject = diskUrlParts[diskUrlParts.indexOf('projects') + 1];
 
-        const projectsKeywordIndex = urlParts.indexOf('projects');
-        if (projectsKeywordIndex !== -1 && projectsKeywordIndex + 1 < urlParts.length) {
-            imageProject = urlParts[projectsKeywordIndex + 1];
-        } else {
-            console.warn(`[getVmOsType] No se pudo extraer project ID de la URL de la imagen: ${sourceImageLink}. Usando el Project ID de la aplicación: ${GCP_PROJECT_ID}.`);
-        }
+            console.log(`[getVmOsType] VM: ${vm.name}, Intentando obtener detalles del disco: project='${diskProject}', zone='${diskZone}', disk='${diskName}'`);
+            const [detailedDisk] = await disksClient.get({
+                project: diskProject,
+                zone: diskZone,
+                disk: diskName
+            });
 
-        const imagesKeywordIndex = urlParts.indexOf('images');
-        let imageNameOrFamily = '';
+            console.log(`[getVmOsType] VM: ${vm.name}, Disco detallado obtenido: ${detailedDisk.name}`);
 
-        if (imagesKeywordIndex !== -1 && imagesKeywordIndex + 1 < urlParts.length) {
-            imageNameOrFamily = urlParts[imagesKeywordIndex + 1];
-            if (imageNameOrFamily === 'family' && imagesKeywordIndex + 2 < urlParts.length) {
-                imageNameOrFamily = urlParts[imagesKeywordIndex + 2]; 
+            // Ahora, revisamos la sourceImage y las licencias del disco detallado
+            const detailedSourceImageLink = detailedDisk.sourceImage;
+            
+            // Detección por licenses del disco detallado (muy fiable para Windows)
+            if (detailedDisk.licenses && Array.isArray(detailedDisk.licenses)) {
+                const diskLicenseLink = detailedDisk.licenses[0];
+                if (diskLicenseLink.toLowerCase().includes('windows')) {
+                    console.log(`[getVmOsType] VM: ${vm.name}, SO detectado: Windows (desde licenses de disco detallado)`);
+                    return 'Windows';
+                }
             }
-        } else {
-            throw new Error(`URL de imagen incompleta o mal formada: ${sourceImageLink}.`);
-        }
-        
-        if (!imageNameOrFamily) {
-             throw new Error(`No se pudo extraer el nombre o la familia de la imagen de la URL: ${sourceImageLink}.`);
-        }
 
-        console.log(`[getVmOsType] VM: ${vm.name}, Intentando imagesClient.get con project: '${imageProject}', image: '${imageNameOrFamily}'`);
-        
-        const [image] = await imagesClient.get({
-          project: imageProject, 
-          image: imageNameOrFamily, 
-        });
+            if (detailedSourceImageLink) {
+                // Reutilizamos la lógica de imágenes que ya funciona para la sourceImage del disco
+                const urlParts = detailedSourceImageLink.split('/');
+                let imageProject = GCP_PROJECT_ID; 
 
-        console.log(`[getVmOsType] VM: ${vm.name}, Imagen obtenida: name='${image.name}', family='${image.family || 'N/A'}', description='${image.description || 'N/A'}'`);
+                const projectsKeywordIndex = urlParts.indexOf('projects');
+                if (projectsKeywordIndex !== -1 && projectsKeywordIndex + 1 < urlParts.length) {
+                    imageProject = urlParts[projectsKeywordIndex + 1];
+                }
 
-        const imageDescription = image.description ? image.description.toLowerCase() : '';
-        const imageFamily = image.family ? image.family.toLowerCase() : '';
-        const imageName = image.name ? image.name.toLowerCase() : '';
-        
-        if (imageDescription.includes('windows') || imageFamily.includes('windows') || imageName.includes('windows')) {
-          console.log(`[getVmOsType] VM: ${vm.name}, SO detectado: Windows (desde imagen: ${imageNameOrFamily})`);
-          return 'Windows';
-        } else if (imageDescription.includes('linux') || imageFamily.includes('linux') || imageName.includes('linux') ||
-                   imageDescription.includes('debian') || imageFamily.includes('debian') || imageName.includes('debian') ||
-                   imageDescription.includes('ubuntu') || imageFamily.includes('ubuntu') || imageName.includes('ubuntu') ||
-                   imageDescription.includes('centos') || imageFamily.includes('centos') || imageName.includes('centos') ||
-                   imageDescription.includes('rhel') || imageFamily.includes('rhel') || imageName.includes('rhel') ||
-                   imageDescription.includes('sles') || imageFamily.includes('sles') || imageName.includes('sles') ||
-                   imageDescription.includes('coreos') || imageFamily.includes('coreos') || imageName.includes('coreos') ||
-                   imageDescription.includes('fedora') || imageFamily.includes('fedora') || imageName.includes('fedora')) {
-          console.log(`[getVmOsType] VM: ${vm.name}, SO detectado: Linux (desde imagen: ${imageNameOrFamily})`);
-          return 'Linux';
+                const imagesKeywordIndex = urlParts.indexOf('images');
+                let imageNameOrFamily = '';
+
+                if (imagesKeywordIndex !== -1 && imagesKeywordIndex + 1 < urlParts.length) {
+                    imageNameOrFamily = urlParts[imagesKeywordIndex + 1];
+                    if (imageNameOrFamily === 'family' && imagesKeywordIndex + 2 < urlParts.length) {
+                        imageNameOrFamily = urlParts[imagesKeywordIndex + 2]; 
+                    }
+                }
+                
+                if (imageNameOrFamily) {
+                    console.log(`[getVmOsType] VM: ${vm.name}, Intentando imagesClient.get con (desde disco detallado) project: '${imageProject}', image: '${imageNameOrFamily}'`);
+                    const [image] = await imagesClient.get({
+                        project: imageProject, 
+                        image: imageNameOrFamily, 
+                    });
+
+                    const imageDescription = image.description ? image.description.toLowerCase() : '';
+                    const imageFamily = image.family ? image.family.toLowerCase() : '';
+                    const imageName = image.name ? image.name.toLowerCase() : '';
+                    
+                    if (imageDescription.includes('windows') || imageFamily.includes('windows') || imageName.includes('windows')) {
+                      console.log(`[getVmOsType] VM: ${vm.name}, SO detectado: Windows (desde imagen detallada: ${imageNameOrFamily})`);
+                      return 'Windows';
+                    } else if (imageDescription.includes('linux') || imageFamily.includes('linux') || imageName.includes('linux') ||
+                               imageDescription.includes('debian') || imageFamily.includes('debian') || imageName.includes('debian') ||
+                               imageDescription.includes('ubuntu') || imageFamily.includes('ubuntu') || imageName.includes('ubuntu') ||
+                               imageDescription.includes('centos') || imageFamily.includes('centos') || imageName.includes('centos') ||
+                               imageDescription.includes('rhel') || imageFamily.includes('rhel') || imageName.includes('rhel') ||
+                               imageDescription.includes('sles') || imageFamily.includes('sles') || imageName.includes('sles') ||
+                               imageDescription.includes('coreos') || imageFamily.includes('coreos') || imageName.includes('coreos') ||
+                               imageDescription.includes('fedora') || imageFamily.includes('fedora') || imageName.includes('fedora')) {
+                      console.log(`[getVmOsType] VM: ${vm.name}, SO detectado: Linux (desde imagen detallada: ${imageNameOrFamily})`);
+                      return 'Linux';
+                    }
+                }
+            }
+        } catch (diskError) {
+            console.warn(`[getVmOsType] Error al obtener detalles del disco ${diskSourceLink} para VM ${vm.name}: ${diskError.message}`);
         }
-      } catch (imageError) {
-        console.warn(`[getVmOsType] Error al obtener detalles de imagen para VM ${vm.name} con SourceImageLink ${sourceImageLink}: ${imageError.message}`);
-        const nameFromUrl = sourceImageLink.split('/').pop().toLowerCase();
-        console.log(`[getVmOsType] VM: ${vm.name}, Fallback de detección por nombre de URL: '${nameFromUrl}'`);
-        if (nameFromUrl.includes('windows')) return 'Windows';
-        if (nameFromUrl.includes('linux') || nameFromUrl.includes('debian') || nameFromUrl.includes('ubuntu')) return 'Linux';
-      }
+    }
+    // --- FIN ESTRATEGIA 2 ---
+
+    // --- ESTRATEGIA 3: Fallback a SourceImageLink de VM (si existe) o nombre de la VM ---
+    // Esta parte es menos fiable si las anteriores fallan, pero se mantiene como último intento de detección.
+    const fallbackSourceImageLink = bootDisk.sourceImage || bootDisk.initializeParams?.sourceImage;
+    if (fallbackSourceImageLink) {
+        console.log(`[getVmOsType] VM: ${vm.name}, Intentando detección por SourceImageLink de VM (fallback): ${fallbackSourceImageLink}`); 
+        try {
+            const urlParts = fallbackSourceImageLink.split('/');
+            let imageProject = GCP_PROJECT_ID; 
+            const projectsKeywordIndex = urlParts.indexOf('projects');
+            if (projectsKeywordIndex !== -1 && projectsKeywordIndex + 1 < urlParts.length) {
+                imageProject = urlParts[projectsKeywordIndex + 1];
+            }
+            const imagesKeywordIndex = urlParts.indexOf('images');
+            let imageNameOrFamily = '';
+            if (imagesKeywordIndex !== -1 && imagesKeywordIndex + 1 < urlParts.length) {
+                imageNameOrFamily = urlParts[imagesKeywordIndex + 1];
+                if (imageNameOrFamily === 'family' && imagesKeywordIndex + 2 < urlParts.length) {
+                    imageNameOrFamily = urlParts[imagesKeywordIndex + 2]; 
+                }
+            }
+            if (imageNameOrFamily) {
+                const [image] = await imagesClient.get({ project: imageProject, image: imageNameOrFamily });
+                const imageDescription = image.description ? image.description.toLowerCase() : '';
+                const imageFamily = image.family ? image.family.toLowerCase() : '';
+                const imageName = image.name ? image.name.toLowerCase() : '';
+                
+                if (imageDescription.includes('windows') || imageFamily.includes('windows') || imageName.includes('windows')) {
+                    console.log(`[getVmOsType] VM: ${vm.name}, SO detectado: Windows (desde SourceImageLink VM fallback: ${imageNameOrFamily})`);
+                    return 'Windows';
+                } else if (imageDescription.includes('linux') || imageFamily.includes('linux') || imageName.includes('linux') || imageDescription.includes('debian') || imageFamily.includes('debian') || imageName.includes('debian') || imageDescription.includes('ubuntu') || imageFamily.includes('ubuntu') || imageName.includes('ubuntu') || imageDescription.includes('centos') || imageFamily.includes('centos') || imageName.includes('centos') || imageDescription.includes('rhel') || imageFamily.includes('rhel') || imageName.includes('rhel') || imageDescription.includes('sles') || imageFamily.includes('sles') || imageName.includes('sles') || imageDescription.includes('coreos') || imageFamily.includes('coreos') || imageName.includes('coreos') || imageDescription.includes('fedora') || imageFamily.includes('fedora') || imageName.includes('fedora')) {
+                    console.log(`[getVmOsType] VM: ${vm.name}, SO detectado: Linux (desde SourceImageLink VM fallback: ${imageNameOrFamily})`);
+                    return 'Linux';
+                }
+            }
+        } catch (imageError) {
+            console.warn(`[getVmOsType] Error al obtener detalles de imagen (SourceImageLink VM fallback) para VM ${vm.name}: ${imageError.message}`);
+        }
     }
   }
+  
+  // --- ESTRATEGIA 4: Inferir del nombre de la VM como último recurso ---
+  const vmNameLower = vm.name.toLowerCase();
+  if (vmNameLower.includes('windows') || vmNameLower.includes('win-')) {
+    console.log(`[getVmOsType] VM: ${vm.name}, SO detectado: Windows (desde nombre de VM)`);
+    return 'Windows';
+  } else if (vmNameLower.includes('linux') || vmNameLower.includes('debian') || vmNameLower.includes('ubuntu') || vmNameLower.includes('centos') || vmNameLower.includes('rhel') || vmNameLower.includes('server')) {
+    console.log(`[getVmOsType] VM: ${vm.name}, SO detectado: Linux (desde nombre de VM)`);
+    return 'Linux';
+  }
+
   console.log(`[getVmOsType] VM: ${vm.name}, No se pudo determinar el SO. Devolviendo 'Unknown'.`);
   return 'Unknown';
 }
+
 
 app.post('/api/auth/google', async (req, res) => {
   const { id_token } = req.body;
@@ -319,7 +405,7 @@ app.get('/api/vms/:projectId', authenticateToken, async (req, res) => {
         machineType: vm.machineType.split('/').pop(),
         creationTimestamp: vm.creationTimestamp,
         osType: osType,
-        diskSizeGb: vm.disks && vm.disks.length > 0 ? vm.disks[0].diskSizeGb : undefined // <-- AÑADIR ESTA LÍNEA
+        diskSizeGb: vm.disks && vm.disks.length > 0 ? vm.disks[0].diskSizeGb : undefined // <-- INCLUIR diskSizeGb
     };
 }));
 
@@ -390,7 +476,8 @@ app.post('/api/vms/start/:vmId', authenticateToken, async (req, res) => {
       internalIp: updatedVm.networkInterfaces && updatedVm.networkInterfaces[0]?.networkIP || undefined,
       machineType: updatedVm.machineType ? updatedVm.machineType.split('/').pop() : 'N/A',
       creationTimestamp: updatedVm.creationTimestamp,
-      osType: osType 
+      osType: osType,
+      diskSizeGb: updatedVm.disks && updatedVm.disks.length > 0 ? updatedVm.disks[0].diskSizeGb : undefined // <-- INCLUIR diskSizeGb
     };
     res.json(mappedVm);
   } catch (error) {
@@ -470,7 +557,8 @@ app.post('/api/vms/stop/:vmId', authenticateToken, async (req, res) => {
       internalIp: updatedVm.networkInterfaces && updatedVm.networkInterfaces[0]?.networkIP || undefined,
       machineType: updatedVm.machineType ? updatedVm.machineType.split('/').pop() : 'N/A',
       creationTimestamp: updatedVm.creationTimestamp,
-      osType: osType 
+      osType: osType,
+      diskSizeGb: updatedVm.disks && updatedVm.disks.length > 0 ? updatedVm.disks[0].diskSizeGb : undefined // <-- INCLUIR diskSizeGb
     };
     res.json(mappedVm);
   } catch (error) {
