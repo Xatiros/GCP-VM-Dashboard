@@ -2,12 +2,13 @@
 import React from 'react';
 import { VirtualMachine, VMStatus } from '../types';
 import { PowerIcon, StopIcon, LinkIcon, ChipIcon, LocationMarkerIcon, ClipboardCopyIcon, CogIcon, TerminalIcon } from './icons'; 
+// Asegúrate de que todos los iconos que usas están importados correctamente desde './icons'
 
 interface VMCardProps {
   vm: VirtualMachine;
-  onStart: (vmId: string) => void;
-  onStop: (vmId:string) => void;
-  onConnect: (vm: VirtualMachine) => void; // onConnect abre el modal unificado
+  onStartVM: (vmId: string) => void; // ¡CAMBIADO A onStartVM!
+  onStopVM: (vmId:string) => void;   // ¡CAMBIADO A onStopVM!
+  onConnectVM: (vm: VirtualMachine) => void; // onConnectVM para el modal
   onCopyToClipboard: (text: string, type: string) => void;
   projectId: string; // Necesario para los enlaces de conexión
 }
@@ -62,7 +63,7 @@ const StatusIndicator: React.FC<{ status: VMStatus | string }> = ({ status }) =>
 };
 
 
-export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, onCopyToClipboard, projectId }) => {
+export const VMCard: React.FC<VMCardProps> = ({ vm, onStartVM, onStopVM, onConnectVM, onCopyToClipboard, projectId }) => {
   // Estados de la VM unificados
   const isRunning = vm.status === VMStatus.RUNNING || vm.status === 'CORRER';
   const isStopped = vm.status === VMStatus.STOPPED || vm.status === 'FINALIZADO' || vm.status === 'TERMINATED' || vm.status === 'PARADA';
@@ -71,12 +72,7 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
   // Habilitación de acciones
   const canStart = isStopped && !isTransitioning;
   const canStop = isRunning && !isTransitioning;
-  // El botón de conexión ahora solo necesita que la VM esté corriendo y no en transición (la IP externa se valida en el modal)
   const canOpenConnectModal = isRunning && !isTransitioning; 
-
-  // Enlaces directos a Google Cloud Console (se mantienen para el prop ConnectModal, no para enlaces directos en la tarjeta)
-  // const sshInBrowserLink = `https://ssh.cloud.google.com/v2/ssh/projects/${projectId}/zones/${vm.zone}/instances/${vm.name}`;
-  // const setWindowsPasswordLink = `https://console.cloud.google.com/compute/instancesDetail/zones/${vm.zone}/instances/${vm.name}?project=${projectId}`;
 
   // Detección de VM Windows
   const isWindowsVM = vm.osType === 'Windows'; 
@@ -107,7 +103,7 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
           {/* Botón de "Más opciones de conexión" (TerminalIcon) - Abre el ConnectModal unificado */}
           {!isTransitioning && ( 
             <button 
-              onClick={() => onConnect(vm)} // ESTE BOTÓN YA LLEVA AL MODAL
+              onClick={() => onConnectVM(vm)} // Llama a onConnectVM
               className="ml-2 p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400"
               title="Más opciones de conexión"
             >
@@ -166,7 +162,7 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
         <div className="flex space-x-2"> {/* Fila principal de botones */}
           {/* Botón Encender */}
           <button
-            onClick={() => onStart(vm.id)} 
+            onClick={() => onStartVM(vm.id)} // Llama a onStartVM
             disabled={!canStart}
             className={getActionButtonClass(canStart, 'green')}
           >
@@ -176,7 +172,7 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
 
           {/* Botón Apagar */}
           <button
-            onClick={() => onStop(vm.id)} 
+            onClick={() => onStopVM(vm.id)} // Llama a onStopVM
             disabled={!canStop}
             className={getActionButtonClass(canStop, 'red')}
           >
@@ -186,7 +182,7 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStart, onStop, onConnect, 
           
           {/* BOTÓN CONECTAR - AHORA SIEMPRE ABRE EL MODAL */}
           <button 
-            onClick={() => onConnect(vm)} // Llama a onConnect para abrir el modal
+            onClick={() => onConnectVM(vm)} // Llama a onConnectVM para abrir el modal
             disabled={!canOpenConnectModal} // Habilita/deshabilita el botón según si se puede conectar
             className={`flex-1 inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm transition-colors duration-200
               ${canOpenConnectModal 

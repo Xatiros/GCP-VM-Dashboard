@@ -2,6 +2,7 @@
 import React from 'react';
 import { VirtualMachine } from '../types';
 import { ClipboardCopyIcon, XIcon, DownloadIcon } from './icons'; 
+// Asegúrate de que todos los iconos que necesitas están aquí.
 
 interface ConnectModalProps {
   vm: VirtualMachine;
@@ -93,12 +94,11 @@ use multimon:i:0
         <div className={`grid ${isWindowsVM ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'} gap-6 text-sm`}>
           {/* Columna principal de conexión */}
           <div className="space-y-4">
-            {/* CAMBIO 1: Título "Instrucciones" */}
             <h4 className="font-bold text-gray-800 border-b pb-2 mb-2">Instrucciones</h4>
             
             {isLinuxVM && ( // Opciones para Linux
               <div>
-                <p className="font-medium text-gray-700">Abrir SSH en el Navegador</p> {/* CAMBIO 2 */}
+                <p className="font-medium text-gray-700">Abrir SSH en el Navegador</p>
                 <div className="mt-1 flex items-center bg-gray-100 p-2 rounded-md">
                   <a 
                     href={`https://ssh.cloud.google.com/v2/ssh/projects/${projectId}/zones/${vm.zone}/instances/${vm.name}`} 
@@ -117,13 +117,13 @@ use multimon:i:0
                     <ClipboardCopyIcon className="h-4 w-4" />
                   </button>
                 </div>
-                <p className="mt-1 text-xs text-gray-500">Forma rápida y recomendada para VMs Linux</p> {/* CAMBIO 2 */}
+                <p className="mt-1 text-xs text-gray-500">Forma rápida y recomendada para VMs Linux</p>
               </div>
             )}
 
             {isWindowsVM && ( // Opciones para Windows - Solo descarga RDP y explicaciones
               <div>
-                <p className="font-medium text-gray-700">Descargar archivo de Conexión RDP</p> {/* CAMBIO 2 */}
+                <p className="font-medium text-gray-700">Descargar archivo de Conexión RDP</p>
                 <button
                   onClick={handleDownloadRDP}
                   className="mt-1 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -137,7 +137,7 @@ use multimon:i:0
                   Paso 1: Descargar el archivo .RDP
                 </p>
                 <p className="mt-2 text-xs text-blue-800 font-semibold bg-blue-50 p-2 rounded-md border border-blue-200">
-                  Paso 2: Ejecutar el archivo .RDP y la primera vez le pedirá el usuario y la contraseña, recuerda darle a recordar credenciales al entrar
+                  Paso 2: Ejecutar el archivo .RDP y la primera vez le pedirá el usuario y la contraseña, recuerda darle a "recordar credenciales" al entrar
                 </p>
                 <p className="mt-2 text-xs text-blue-800 font-semibold bg-blue-50 p-2 rounded-md border border-blue-200">
                   Importante: El nombre de usuario y la contraseña para acceder a esta máquina RDP serán facilitados por el Área de IT de tu organización
@@ -145,16 +145,16 @@ use multimon:i:0
                 <p className="mt-2 text-xs text-orange-800 font-semibold bg-orange-50 p-2 rounded-md border border-orange-200">
                   Recordatorio: Por favor, asegúrate de Apagar la máquina virtual cuando hayas terminado de usarla para evitar costes innecesarios
                 </p>
-                {!vm.externalIp && <p className="mt-1 text-xs text-orange-500">VM sin IP externa. La descarga de .RDP no es posible directamente</p>} {/* CAMBIO 2 */}
+                {!vm.externalIp && <p className="mt-1 text-xs text-orange-500">VM sin IP externa. La descarga de .RDP no es posible directamente</p>}
               </div>
             )}
 
             {isUnknownOS && ( // Si el SO es desconocido
               <div>
-                <p className="font-medium text-gray-700">Opciones de Conexión (SO Desconocido)</p> {/* CAMBIO 2 */}
+                <p className="font-medium text-gray-700">Opciones de Conexión (SO Desconocido)</p>
                  <div className="mt-1 flex items-center bg-gray-100 p-2 rounded-md">
                   <a 
-                    href={`https://console.cloud.google.com/compute/instancesDetail/zones/${vm.zone}/instances/${projectId}`} // Asegúrate que esto apunta a la VM correcta
+                    href={`https://console.cloud.google.com/compute/instancesDetail/zones/${vm.zone}/instances/${projectId}`} 
                     target="_blank" 
                     rel="noopener noreferrer" 
                     className="text-gcp-blue hover:underline flex-grow truncate"
@@ -170,7 +170,7 @@ use multimon:i:0
                     <ClipboardCopyIcon className="h-4 w-4" />
                   </button>
                 </div>
-                <p className="mt-1 text-xs text-orange-600 font-semibold">No se pudo determinar el tipo de sistema operativo. Considera revisar la configuración de la VM o usar la Consola de GCP para la conexión</p> {/* CAMBIO 2 */}
+                <p className="mt-1 text-xs text-orange-600 font-semibold">No se pudo determinar el tipo de sistema operativo. Considera revisar la configuración de la VM o usar la Consola de GCP para la conexión</p>
               </div>
             )}
           </div>
@@ -183,7 +183,7 @@ use multimon:i:0
               {isLinuxVM && ( // Opciones para Linux
                 <div className="space-y-3">
                   <div>
-                    <p className="font-medium text-gray-700">Via SSH (Cliente externo, IP Externa)</p> {/* CAMBIO 2 */}
+                    <p className="font-medium text-gray-700">Via SSH (Cliente externo, IP Externa)</p>
                     <div className="mt-1 flex items-center bg-gray-100 p-2 rounded-md text-xs">
                       <code className="text-gray-700 flex-grow select-all break-all">{sshCommand}</code>
                       <button
@@ -194,12 +194,12 @@ use multimon:i:0
                         <ClipboardCopyIcon className="h-4 w-4" />
                       </button>
                     </div>
-                    <p className="mt-1 text-xs text-gray-500">Reemplaza <code>your_user</code> con tu usuario en la VM</p> {/* CAMBIO 2 */}
-                    {!vm.externalIp && <p className="mt-1 text-xs text-orange-500">VM sin IP externa</p>} {/* CAMBIO 2 */}
+                    <p className="mt-1 text-xs text-gray-500">Reemplaza <code>your_user</code> con tu usuario en la VM</p>
+                    {!vm.externalIp && <p className="mt-1 text-xs text-orange-500">VM sin IP externa</p>}
                   </div>
 
                   <div>
-                    <p className="font-medium text-gray-700">Via Google Cloud Shell (gcloud CLI)</p> {/* CAMBIO 2 */}
+                    <p className="font-medium text-gray-700">Via Google Cloud Shell (gcloud CLI)</p>
                     <div className="mt-1 flex items-center bg-gray-100 p-2 rounded-md text-xs">
                       <code className="text-gray-700 flex-grow select-all break-all">{gcloudCommand}</code>
                       <button
@@ -210,16 +210,16 @@ use multimon:i:0
                         <ClipboardCopyIcon className="h-4 w-4" />
                       </button>
                     </div>
-                    <p className="mt-1 text-xs text-gray-500">Útil si tienes la CLI de GCP configurada localmente</p> {/* CAMBIO 2 */}
+                    <p className="mt-1 text-xs text-gray-500">Útil si tienes la CLI de GCP configurada localmente</p>
                   </div>
                 </div>
               )}
 
               {isUnknownOS && ( // Opciones genéricas si el SO es desconocido
                 <div className="space-y-3">
-                  <p className="font-medium text-gray-700">Opciones de Comando (SO Desconocido)</p> {/* CAMBIO 2 */}
+                  <p className="font-medium text-gray-700">Opciones de Comando (SO Desconocido)</p>
                     <div>
-                      <p className="font-medium text-gray-700">Intento SSH (IP Externa)</p> {/* CAMBIO 2 */}
+                      <p className="font-medium text-gray-700">Intento SSH (IP Externa)</p>
                       <div className="mt-1 flex items-center bg-gray-100 p-2 rounded-md text-xs">
                         <code className="text-gray-700 flex-grow select-all break-all">{sshCommand}</code>
                         <button
@@ -230,10 +230,10 @@ use multimon:i:0
                           <ClipboardCopyIcon className="h-4 w-4" />
                         </button>
                       </div>
-                      {!vm.externalIp && <p className="mt-1 text-xs text-orange-500">VM sin IP externa</p>} {/* CAMBIO 2 */}
+                      {!vm.externalIp && <p className="mt-1 text-xs text-orange-500">VM sin IP externa</p>}
                     </div>
                     <div>
-                      <p className="font-medium text-gray-700">Intento RDP (IP Externa)</p> {/* CAMBIO 2 */}
+                      <p className="font-medium text-gray-700">Intento RDP (IP Externa)</p>
                       <div className="mt-1 flex items-center bg-gray-100 p-2 rounded-md text-xs">
                         <code className="text-gray-700 flex-grow select-all break-all">{vm.externalIp ? `mstsc /v:${vm.externalIp}` : 'N/A (No External IP)'}</code>
                         <button
@@ -244,7 +244,7 @@ use multimon:i:0
                           <ClipboardCopyIcon className="h-4 w-4" />
                         </button>
                       </div>
-                      {!vm.externalIp && <p className="mt-1 text-xs text-orange-500">VM sin IP externa</p>} {/* CAMBIO 2 */}
+                      {!vm.externalIp && <p className="mt-1 text-xs text-orange-500">VM sin IP externa</p>}
                     </div>
                 </div>
               )}
