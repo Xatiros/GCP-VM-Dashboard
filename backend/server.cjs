@@ -131,21 +131,20 @@ async function getVmOsType(vm) {
     return 'Unknown';
   }
 
-  // Verificar si hay discos y si el primero es un disco de arranque
   if (vm.disks && vm.disks.length > 0 && vm.disks[0].boot) {
     const bootDisk = vm.disks[0];
-    const sourceImageLink = bootDisk.initializeParams?.sourceImage;
+    
+    // --- CAMBIO CLAVE AQUÍ: Intentar primero bootDisk.sourceImage ---
+    const sourceImageLink = bootDisk.sourceImage || bootDisk.initializeParams?.sourceImage;
+    // --- FIN CAMBIO CLAVE ---
 
     console.log(`[getVmOsType] VM: ${vm.name}, SourceImageLink: ${sourceImageLink}`); 
     
     if (sourceImageLink) {
       try {
         const urlParts = sourceImageLink.split('/');
-        let imageProject = GCP_PROJECT_ID; // Asumir el proyecto actual como fallback robusto
+        let imageProject = GCP_PROJECT_ID; 
 
-        // Intentar extraer el project ID de la URL
-        // La URL de la imagen podría ser: projects/{project}/global/images/{image_name}
-        // O: https://www.googleapis.com/compute/v1/projects/{project}/global/images/{image_name}
         const projectsKeywordIndex = urlParts.indexOf('projects');
         if (projectsKeywordIndex !== -1 && projectsKeywordIndex + 1 < urlParts.length) {
             imageProject = urlParts[projectsKeywordIndex + 1];
@@ -159,7 +158,7 @@ async function getVmOsType(vm) {
         if (imagesKeywordIndex !== -1 && imagesKeywordIndex + 1 < urlParts.length) {
             imageNameOrFamily = urlParts[imagesKeywordIndex + 1];
             if (imageNameOrFamily === 'family' && imagesKeywordIndex + 2 < urlParts.length) {
-                imageNameOrFamily = urlParts[imagesKeywordIndex + 2]; // Obtener el nombre de la familia
+                imageNameOrFamily = urlParts[imagesKeywordIndex + 2]; 
             }
         } else {
             throw new Error(`URL de imagen incompleta o mal formada: ${sourceImageLink}.`);
@@ -168,7 +167,6 @@ async function getVmOsType(vm) {
         if (!imageNameOrFamily) {
              throw new Error(`No se pudo extraer el nombre o la familia de la imagen de la URL: ${sourceImageLink}.`);
         }
-
 
         console.log(`[getVmOsType] VM: ${vm.name}, Intentando imagesClient.get con project: '${imageProject}', image: '${imageNameOrFamily}'`);
         
