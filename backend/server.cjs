@@ -135,39 +135,52 @@ async function getVmOsType(vm) {
     return 'Unknown';
   }
 
-  // Verificar si hay discos y si el primero es un disco de arranque
   if (vm.disks && vm.disks.length > 0 && vm.disks[0].boot) {
     const bootDisk = vm.disks[0];
     const sourceImageLink = bootDisk.initializeParams?.sourceImage;
 
+    console.log(`[DEBUG SO] VM: ${vm.name}, SourceImageLink: ${sourceImageLink}`); // Log la URL original
+    
     if (sourceImageLink) {
       try {
-        // Extraer project y image name/family de la URL de la imagen.
-        // URLs pueden ser:
-        // projects/{project}/global/images/{image}
-        // projects/{project}/global/images/family/{family}
         const urlParts = sourceImageLink.split('/');
-        const imageIdIndex = urlParts.indexOf('images') + 1;
-        
+        const imageIdIndex = urlParts.indexOf('images') + 1; // Debería apuntar al nombre o 'family'
+
         let imageProject = 'google'; // Asumir 'google' para imágenes públicas por defecto
-        if (urlParts.includes('projects') && urlParts.indexOf('projects') + 1 < urlParts.length) {
-            imageProject = urlParts[urlParts.indexOf('projects') + 1];
+        // La URL de la imagen podría ser: projects/{project}/global/images/{image_name}
+        // O: https://www.googleapis.com/compute/v1/projects/{project}/global/images/{image_name}
+        // O: projects/{project}/global/images/family/{family_name}
+        
+        // Extraer el project ID de la URL
+        const projectIndex = urlParts.indexOf('projects');
+        if (projectIndex !== -1 && projectIndex + 1 < urlParts.length) {
+            imageProject = urlParts[projectIndex + 1];
+        } else {
+            // Si no encuentra 'projects/' en la URL, podría ser una imagen de proyecto actual o de un proyecto 'por defecto'
+            // Podríamos intentar usar GCP_PROJECT_ID o un proyecto común como 'debian-cloud', 'windows-cloud'
+            // Esto es un fallback, y puede que no sea robusto.
+            console.warn(`[DEBUG SO] No se pudo extraer project ID de la URL de la imagen: ${sourceImageLink}. Usando el Project ID por defecto de la app: ${GCP_PROJECT_ID}.`);
+            imageProject = GCP_PROJECT_ID; // Fallback al Project ID de tu aplicación
         }
 
-        let imageNameOrFamily = urlParts[imageIdIndex]; // Puede ser 'family' o el nombre de la imagen
-        if (imageNameOrFamily === 'family') {
-            imageNameOrFamily = urlParts[imageIdIndex + 1]; // Obtener el nombre de la familia
+        let imageNameOrFamily = urlParts[imageIdIndex]; // Nombre de la imagen o 'family'
+        if (imageNameOrFamily === 'family' && imageIdIndex + 1 < urlParts.length) {
+            imageNameOrFamily = urlParts[imageIdIndex + 1]; // Obtener el nombre de la familia si es una familia
+        } else if (imageIdIndex >= urlParts.length) { // Si 'images' es lo último, hay un problema en la URL
+            throw new Error("URL de imagen incompleta o mal formada.");
         }
 
-        // Si la imagen es una "family", ImagesClient.get() necesita la familia para resolver la última imagen.
-        // Si es un nombre directo, ImagesClient.get() lo busca directamente.
+        console.log(`[DEBUG SO] VM: ${vm.name}, Intentando imagesClient.get con project: '${imageProject}', image: '${imageNameOrFamily}'`); // Log los parámetros de la llamada a la API
         
         const [image] = await imagesClient.get({
-          project: imageProject, // El proyecto donde se aloja la imagen (ej. 'windows-cloud', 'debian-cloud')
-          image: imageNameOrFamily, // Nombre o familia de la imagen
+          project: imageProject, 
+          image: imageNameOrFamily, 
         });
 
-        // Inferir el SO basado en los metadatos de la imagen
+        // <--- AÑADIR ESTOS LOGS PARA VER LOS METADATOS OBTENIDOS
+        console.log(`[DEBUG SO] VM: ${vm.name}, Imagen obtenida: name='${image.name}', family='${image.family}', description='${image.description}'`);
+        // FIN LOGS METADATOS
+
         const imageDescription = image.description ? image.description.toLowerCase() : '';
         const imageFamily = image.family ? image.family.toLowerCase() : '';
         const imageName = image.name ? image.name.toLowerCase() : '';
@@ -184,6 +197,18 @@ async function getVmOsType(vm) {
           return 'Linux';
         }
       } catch (imageError) {
+        console.warn(`[BACKEND] Error al intentar obtener detalles de imagen para VM ${vm.name} con SourceImageLink ${sourceImageLink}:`, imageError.message);
+        // Fallback: intentar inferir del nombre de la URL si imagesClient.get falló
+        const nameFromUrl = sourceImageLink.split('/').pop().toLowerCase();
+        console.log(`[DEBUG SO] VM: ${vm.name}, Fallback de detección por nombre de URL: '${nameFromUrl}'`);
+        if (nameFromUrl.includes('windows')) return 'Windows';
+        if (nameFromUrl.includes('linux') || nameFromUrl.includes('debian') || nameFromUrl.includes('ubuntu')) return 'Linux';
+      }
+    }
+  }
+  console.log(`[BACKEND] VM: ${vm.name}, No se pudo determinar el SO. Devolviendo 'Unknown'.`);
+  return 'Unknown';
+}      } catch (imageError) {
         console.warn(`[BACKEND] Error al intentar determinar el SO para VM ${vm.name} desde la imagen ${sourceImageLink}:`, imageError.message);
         // Si falla la obtención de la imagen, intentamos inferir del nombre de la URL como fallback
         const nameFromUrl = sourceImageLink.split('/').pop().toLowerCase();
