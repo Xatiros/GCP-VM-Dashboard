@@ -140,10 +140,29 @@ async function getVmOsType(vm) {
   if (vm.disks && vm.disks.length > 0 && vm.disks[0].boot) {
     const bootDisk = vm.disks[0];
     
-    // --- Log el contenido completo del bootDisk para depuración ---
     console.log(`[DEBUG DISKS] VM: ${vm.name}, bootDisk content: ${JSON.stringify(bootDisk, null, 2)}`);
-    // --- Fin Log ---
 
+    // --- NUEVA LÓGICA DE DETECCIÓN DE SO PRIORITARIA ---
+    if (bootDisk.guestOsFeatures && Array.isArray(bootDisk.guestOsFeatures)) {
+        const guestFeatures = bootDisk.guestOsFeatures.map(f => f.type).filter(Boolean).map(t => t.toLowerCase());
+        if (guestFeatures.includes('windows')) {
+            console.log(`[getVmOsType] VM: ${vm.name}, SO detectado: Windows (desde guestOsFeatures)`);
+            return 'Windows';
+        }
+        // Puedes añadir más si tienes Linux y sabes qué features buscar (ej. VIRTIO_NET)
+    }
+
+    if (bootDisk.licenses && Array.isArray(bootDisk.licenses)) {
+        const licenseLink = bootDisk.licenses[0]; // Asumir que la primera licencia es la más relevante
+        if (licenseLink.toLowerCase().includes('windows')) {
+            console.log(`[getVmOsType] VM: ${vm.name}, SO detectado: Windows (desde licenses)`);
+            return 'Windows';
+        }
+        // Para Linux, podrías buscar 'debian', 'ubuntu', etc. en la licencia, pero es menos común.
+    }
+    // --- FIN NUEVA LÓGICA DE DETECCIÓN PRIORITARIA ---
+
+    // La lógica anterior para sourceImageLink, ahora como fallback si las nuevas fallan
     const sourceImageLink = bootDisk.sourceImage || bootDisk.initializeParams?.sourceImage;
 
     console.log(`[getVmOsType] VM: ${vm.name}, SourceImageLink: ${sourceImageLink}`); 
@@ -205,7 +224,6 @@ async function getVmOsType(vm) {
         }
       } catch (imageError) {
         console.warn(`[getVmOsType] Error al obtener detalles de imagen para VM ${vm.name} con SourceImageLink ${sourceImageLink}: ${imageError.message}`);
-        // Fallback: intentar inferir del nombre de la URL si imagesClient.get falló
         const nameFromUrl = sourceImageLink.split('/').pop().toLowerCase();
         console.log(`[getVmOsType] VM: ${vm.name}, Fallback de detección por nombre de URL: '${nameFromUrl}'`);
         if (nameFromUrl.includes('windows')) return 'Windows';
@@ -216,7 +234,6 @@ async function getVmOsType(vm) {
   console.log(`[getVmOsType] VM: ${vm.name}, No se pudo determinar el SO. Devolviendo 'Unknown'.`);
   return 'Unknown';
 }
-
 
 app.post('/api/auth/google', async (req, res) => {
   const { id_token } = req.body;
@@ -290,8 +307,8 @@ app.get('/api/vms/:projectId', authenticateToken, async (req, res) => {
     console.log(`[BACKEND] Se encontraron ${vms.length} VMs en las zonas europeas de GCP.`);
 
     const mappedVms = await Promise.all(vms.map(async (vm) => { 
-      const osType = await getVmOsType(vm); 
-      return {
+    const osType = await getVmOsType(vm); 
+    return {
         id: vm.id,
         name: vm.name,
         status: vm.status === 'CORRER' ? 'RUNNING' : (vm.status === 'PARADA' ? 'STOPPED' : vm.status),
@@ -301,9 +318,10 @@ app.get('/api/vms/:projectId', authenticateToken, async (req, res) => {
         internalIp: vm.networkInterfaces && vm.networkInterfaces[0]?.networkIP || undefined,
         machineType: vm.machineType.split('/').pop(),
         creationTimestamp: vm.creationTimestamp,
-        osType: osType 
-      };
-    }));
+        osType: osType,
+        diskSizeGb: vm.disks && vm.disks.length > 0 ? vm.disks[0].diskSizeGb : undefined // <-- AÑADIR ESTA LÍNEA
+    };
+}));
 
     console.log("[BACKEND] VMs mapeadas, enviando respuesta al frontend...");
     res.json(mappedVms);

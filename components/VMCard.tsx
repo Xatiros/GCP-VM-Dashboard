@@ -2,15 +2,16 @@
 import React from 'react';
 import { VirtualMachine, VMStatus } from '../types';
 import { PowerIcon, StopIcon, LinkIcon, ChipIcon, LocationMarkerIcon, ClipboardCopyIcon, CogIcon } from './icons'; 
-// Eliminado TerminalIcon de las importaciones, ya no se usa.
+// Asegúrate de que todos los iconos que usas estén importados correctamente desde './icons'
+// TerminalIcon ha sido eliminado ya que el botón de "Más opciones" se ha unificado con el de "Conectar"
 
 interface VMCardProps {
   vm: VirtualMachine;
   onStartVM: (vmId: string) => void; 
   onStopVM: (vmId:string) => void;   
-  onConnectVM: (vm: VirtualMachine) => void; // onConnectVM para el modal
+  onConnectVM: (vm: VirtualMachine) => void; // onConnectVM para el modal de instrucciones
   onCopyToClipboard: (text: string, type: string) => void;
-  projectId: string; 
+  projectId: string; // Necesario para los enlaces de conexión
 }
 
 const StatusIndicator: React.FC<{ status: VMStatus | string }> = ({ status }) => {
@@ -102,15 +103,7 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStartVM, onStopVM, onConne
         <div className="flex justify-between items-center relative"> 
           <h3 className="text-xl font-bold text-gray-800 truncate" title={vm.name}>{vm.name}</h3>
           {/* ELIMINADO: Botón de "Más opciones de conexión" (TerminalIcon) */}
-          {/* {!isTransitioning && ( 
-            <button 
-              onClick={() => onConnectVM(vm)} 
-              className="ml-2 p-1 rounded hover:bg-gray-200 text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400"
-              title="Más opciones de conexión"
-            >
-              <TerminalIcon className="h-6 w-6" /> 
-            </button>
-          )} */}
+          {/* Ya no es necesario, el botón "Conectar" de abajo lo abre todo */}
         </div>
         <div className="mt-1 flex items-center justify-between">
           <StatusIndicator status={vm.status} />
@@ -153,6 +146,15 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStartVM, onStopVM, onConne
               <ClipboardCopyIcon className="h-4 w-4" />
             </button>
         </div>
+        {/* AÑADIDO: Mostrar tamaño de disco */}
+        {vm.diskSizeGb && (
+          <div className="flex items-center">
+            <svg className="h-4 w-4 mr-2 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10m0 0h16m0-4V7m0 0L8 15V7h12z" />
+            </svg> {/* Icono de disco genérico si no tienes uno específico */}
+            <span>Tamaño de disco: {vm.diskSizeGb} GB</span>
+          </div>
+        )}
         <div className="flex items-center">
           <CogIcon className="h-4 w-4 mr-2 text-gray-400" />
           <span>Tipo: {vm.machineType}</span>
@@ -181,7 +183,7 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStartVM, onStopVM, onConne
             Apagar
           </button>
           
-          {/* BOTÓN CONECTAR - AHORA ES EL ÚNICO BOTÓN PARA ACCEDER AL MODAL DE INSTRUCCIONES */}
+          {/* BOTÓN CONECTAR - AHORA SIEMPRE ABRE EL MODAL DE INSTRUCCIONES */}
           <button 
             onClick={() => onConnectVM(vm)} // Llama a onConnectVM para abrir el modal
             disabled={!canOpenConnectModal} // Habilita/deshabilita el botón según si se puede conectar

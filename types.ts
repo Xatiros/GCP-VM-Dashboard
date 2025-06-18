@@ -19,6 +19,7 @@ export interface VirtualMachine {
   machineType: string;
   creationTimestamp?: string; 
   osType?: 'Linux' | 'Windows' | 'Other'; 
+  diskSizeGb?: string;
 }
 
 export interface GCPProject {

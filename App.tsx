@@ -6,12 +6,19 @@ import { ConnectModal } from './components/ConnectModal';
 import { Spinner } from './components/Spinner';
 import { Toast } from './components/Toast';
 import { VirtualMachine, VMStatus, GCPProject } from './types';
+// Importamos las funciones de servicio que ahora usan la URL dinámica
 import { fetchVMs as apiFetchVMs, startVM as apiStartVM, stopVM as apiStopVM } from './services/vmService';
-import { RefreshIcon, SearchIcon, CogIcon } from './components/icons';
+import { RefreshIcon, SearchIcon, CogIcon } from './components/icons'; 
 import { AuthButton } from './components/AuthButton';
 
-// Define la URL de autenticación del backend
-const BACKEND_AUTH_ENDPOINT_URL = process.env.VITE_APP_BACKEND_AUTH_URL || 'http://localhost:3001/api/auth/google';
+// Define la URL base de la API del backend.
+// En desarrollo local (npm run dev), import.meta.env.VITE_APP_BACKEND_API_BASE_URL estará indefinida,
+// por lo que usará 'http://localhost:8080/api'.
+// En producción (Cloud Build), VITE_APP_BACKEND_API_BASE_URL se inyectará desde tu cloudbuild.yaml de frontend.
+const API_BASE_FOR_FRONTEND = import.meta.env.VITE_APP_BACKEND_API_BASE_URL || 'http://localhost:8080/api';
+
+// La URL específica para la autenticación de Google
+const BACKEND_AUTH_ENDPOINT_URL = `${API_BASE_FOR_FRONTEND}/auth/google`;
 
 // Configuración del polling
 const GLOBAL_POLLING_INTERVAL_MS = 30000; // Polling global más lento: 30 segundos
@@ -29,17 +36,12 @@ const App: React.FC = () => {
   const [selectedVMForConnect, setSelectedVMForConnect] = useState<VirtualMachine | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // --- Manejo de Polling Individual para Transiciones ---
-  const transitionPollingTimers = useRef<{ [vmId: string]: NodeJS.Timeout }>({}); // Usa un nombre más específico
-  // --- FIN Manejo de Polling Individual ---
+  const transitionPollingTimers = useRef<{ [vmId: string]: NodeJS.Timeout }>({});
 
-  // --- ESTADO DE AUTENTICACIÓN ---
   const [appToken, setAppToken] = useState<string | null>(localStorage.getItem('appToken'));
   const [userEmail, setUserEmail] = useState<string | null>(localStorage.getItem('userEmail'));
   const [isAuthenticating, setIsAuthenticating] = useState(false);
-  // --- FIN ESTADO DE AUTENTICACIÓN ---
 
-  // Tus credenciales y proyectos
   const GCP_PROJECT_ID_REAL = 'puestos-de-trabajo-potentes'; 
   const GOOGLE_CLIENT_ID = '780691668337-fagffk8595v6cdasflrj5pbpcoloc96d.apps.googleusercontent.com'; 
 
@@ -66,21 +68,20 @@ const App: React.FC = () => {
       const fetchedVMs = await apiFetchVMs(selectedProject.id, appToken); 
       setVms(fetchedVMs);
 
-      // Después de cargar las VMs, activa/desactiva los pollings individuales
       fetchedVMs.forEach(vm => {
         const isTransitioningState = vm.status === 'PROVISIONING' || vm.status === 'STAGING' || vm.status === 'SUSPENDING';
         if (isTransitioningState && !transitionPollingTimers.current[vm.id]) {
             console.log(`[Polling] Iniciando polling rápido para VM en transición: ${vm.name} (${vm.status})`);
-            startTransitionPolling(vm.id); // Inicia el polling rápido si es necesario
+            startTransitionPolling(vm.id); 
         } else if (!isTransitioningState && transitionPollingTimers.current[vm.id]) {
             console.log(`[Polling] Deteniendo polling rápido para VM: ${vm.name} (${vm.status})`);
             clearTimeout(transitionPollingTimers.current[vm.id]);
             delete transitionPollingTimers.current[vm.id];
-            showToast(`VM '${vm.name}' ahora en estado: ${vm.status}`); // Notificación cuando termina transición
+            showToast(`VM '${vm.name}' ahora en estado: ${vm.status}.`); 
         }
       });
 
-    } catch (err) {
+    } catch (err: any) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido al cargar VMs.';
       setError(`No se pudieron cargar las máquinas virtuales: ${errorMessage}. Inténtalo de nuevo.`);
       console.error("Error al cargar VMs en el frontend:", err);
@@ -92,30 +93,23 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProject, appToken]); // Depende de selectedProject y appToken
+  }, [selectedProject, appToken]); 
 
-  // Función para iniciar el polling rápido individual de una VM
   const startTransitionPolling = useCallback((vmId: string) => {
-    // Si ya existe un timer para esta VM, no hagas nada (o límpialo y vuelve a empezar si cambias de idea)
     if (transitionPollingTimers.current[vmId]) {
       return; 
     }
 
     const pollSingleVm = async () => {
-      // Forzar una carga global para actualizar todos los estados
       await loadVMs(); 
-      // La lógica de detener el polling se maneja dentro de loadVMs()
     };
 
-    // Inicia el polling y guarda la referencia
     transitionPollingTimers.current[vmId] = setTimeout(pollSingleVm, TRANSITION_POLLING_INTERVAL_MS);
   }, [loadVMs]);
 
-
-  // Efecto para el polling GLOBAL
   useEffect(() => {
     if (appToken) { 
-      loadVMs(); // Carga inicial al obtener el token
+      loadVMs(); 
       showToast(`Actualización global de VMs cada ${GLOBAL_POLLING_INTERVAL_MS / 1000} segundos iniciada.`);
       const globalIntervalId = setInterval(loadVMs, GLOBAL_POLLING_INTERVAL_MS);
       return () => {
@@ -129,17 +123,15 @@ const App: React.FC = () => {
     }
   }, [appToken, loadVMs]);
 
-  // Limpiar todos los timers de polling (global e individuales) al desmontar el App
   useEffect(() => {
     return () => {
-      // Limpiar el timer global ya se maneja en el useEffect anterior
-      // Limpiar timers individuales
       for (const vmId in transitionPollingTimers.current) {
         clearTimeout(transitionPollingTimers.current[vmId]);
         delete transitionPollingTimers.current[vmId];
       }
     };
   }, []);
+
 
   const handleStartVM = async (vmId: string) => {
     const vmToStart = vms.find(vm => vm.id === vmId);
@@ -149,23 +141,21 @@ const App: React.FC = () => {
       return;
     }
 
-    // Optimistic UI update
     setVms(prevVms => prevVms.map(vm => vm.id === vmId ? { ...vm, status: VMStatus.PROVISIONING } : vm));
     showToast(`Iniciando VM '${vmToStart.name}'...`);
     try {
       const updatedVM = await apiStartVM(vmId, vmToStart.zone, selectedProject.id, appToken); 
       setVms(prevVms => prevVms.map(vm => vm.id === vmId ? updatedVM : vm));
       
-      // Iniciar polling rápido para esta VM
       startTransitionPolling(vmId);
 
-    } catch (err) {
+    } catch (err: any) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido al iniciar VM.';
       setError(`Fallo al iniciar VM '${vmToStart.name}': ${errorMessage}.`);
       setVms(prevVms => prevVms.map(vm => vm.id === vmId ? { ...vmToStart, status: VMStatus.STOPPED } : vm)); 
       showToast(`Error al iniciar VM '${vmToStart.name}'.`);
       console.error("Error al iniciar VM:", err);
-      if (errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('sesión expirada')) {
+      if (errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('No autorizado') || errorMessage.includes('sesión expirada')) {
         handleLogout();
       }
     }
@@ -178,17 +168,15 @@ const App: React.FC = () => {
     if (!window.confirm(`¿Estás seguro de que quieres DETENER la VM '${vmToStop.name}'? Esto podría interrumpir servicios.`)) {
       return;
     }
-    // Optimistic UI update
     setVms(prevVms => prevVms.map(vm => vm.id === vmId ? { ...vm, status: VMStatus.SUSPENDING } : vm));
     showToast(`Deteniendo VM '${vmToStop.name}'...`);
     try {
       const updatedVM = await apiStopVM(vmId, vmToStop.zone, selectedProject.id, appToken); 
       setVms(prevVms => prevVms.map(vm => vm.id === vmId ? updatedVM : vm));
 
-      // Iniciar polling rápido para esta VM
       startTransitionPolling(vmId);
 
-    } catch (err) {
+    } catch (err: any) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido al detener VM.';
       setError(`Fallo al detener VM '${vmToStop.name}': ${errorMessage}.`);
       setVms(prevVms => prevVms.map(vm => vm.id === vmId ? { ...vmToStop, status: VMStatus.RUNNING } : vm)); 
@@ -226,7 +214,7 @@ const App: React.FC = () => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({ message: response.statusText })); // Intentar parsear el error si es JSON
         throw new Error(errorData.message || 'Fallo al obtener token de sesión de la aplicación.');
       }
 
@@ -237,8 +225,8 @@ const App: React.FC = () => {
       setUserEmail(data.user.email);
       showToast(`Bienvenido, ${data.user.name || data.user.email}!`);
 
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Error desconocido de autenticación.';
+    } catch (err: any) {
+      const errorMessage = err.message || 'Error desconocido de autenticación.';
       setError(`Error de autenticación: ${errorMessage}`);
       showToast('Error en el inicio de sesión con Google.');
       console.error("Error en handleGoogleAuthSuccess:", err);
@@ -256,7 +244,6 @@ const App: React.FC = () => {
     showToast('Sesión cerrada.');
   };
 
-
   const availableZones = useMemo(() => {
     const zones = new Set(vms.map(vm => vm.zone));
     return ['ALL', ...Array.from(zones).sort()];
@@ -270,15 +257,11 @@ const App: React.FC = () => {
         const zoneMatch = zoneFilter === 'ALL' || vm.zone === zoneFilter;
         return nameMatch && statusMatch && zoneMatch;
       })
-      // <--- AÑADIR LÓGICA DE ORDENAMIENTO AQUÍ
       .sort((a, b) => {
-        // Para ordenar alfanuméricamente por nombre (ej. pepi1, pepi2, pepi4)
-        // Esto manejará números dentro de los nombres también
         const nameA = a.name.toLowerCase();
         const nameB = b.name.toLowerCase();
 
-        // Implementación de ordenamiento natural (maneja números correctamente)
-        const partsA = nameA.split(/(\d+)/).filter(Boolean); // Divide por dígitos
+        const partsA = nameA.split(/(\d+)/).filter(Boolean); 
         const partsB = nameB.split(/(\d+)/).filter(Boolean);
 
         for (let i = 0; i < Math.min(partsA.length, partsB.length); i++) {
@@ -299,10 +282,8 @@ const App: React.FC = () => {
             if (partA > partB) return 1;
           }
         }
-        return partsA.length - partsB.length; // Si son iguales hasta aquí, el más corto va primero
+        return partsA.length - partsB.length; 
       });
-      // <--- FIN LÓGICA DE ORDENAMIENTO
-
   }, [vms, searchTerm, statusFilter, zoneFilter]);
 
   if (!appToken) { 
@@ -314,7 +295,7 @@ const App: React.FC = () => {
           <AuthButton 
             clientId={GOOGLE_CLIENT_ID}
             onSuccess={handleGoogleAuthSuccess}
-            onError={(err) => {
+            onError={(err: any) => { // Especificar tipo para 'err'
               setError(`Fallo en la autenticación de Google: ${err.message}`);
               showToast("Fallo en el inicio de sesión.");
             }}
@@ -328,7 +309,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col">
       <Header 
-        appName="Cloud VM Manager"
+        appName="Cloud VM Manager" 
         projects={ALL_PROJECTS}
         selectedProject={selectedProject}
         onProjectChange={setSelectedProject}
@@ -424,8 +405,8 @@ const App: React.FC = () => {
           {!isLoading && !error && filteredVMs.length > 0 && (
             <VMList
               vms={filteredVMs}
-              onStartVM={handleStartVM} // NOMBRES DE PROP COINCIDEN CON VMCard.tsx
-              onStopVM={handleStopVM}   // NOMBRES DE PROP COINCIDEN CON VMCard.tsx
+              onStartVM={handleStartVM} 
+              onStopVM={handleStopVM}   
               onConnectVM={handleConnectVM} 
               onCopyToClipboard={handleCopyToClipboard}
               projectId={selectedProject.id} 
