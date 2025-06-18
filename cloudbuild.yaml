@@ -26,7 +26,7 @@ steps:
     '--region', 'europe-southwest1', # Tu región
     '--platform', 'managed',
     '--allow-unauthenticated', # Permite acceso público a tu frontend (ajusta si es privado)
-    # --- ¡LÍNEA CRÍTICA! Inyectar la URL del BACKEND para que el frontend sepa dónde llamar ---
+    # --- ¡LÍNEA CRÍTICA PARA INYECTAR LA URL DEL BACKEND EN EL FRONTEND! ---
     '--set-env-vars', 'VITE_APP_BACKEND_API_BASE_URL=https://gcp-vm-dashboard-backend-service-780691668337.europe-southwest1.run.app/api' # <-- ¡URL BASE REAL DE TU BACKEND DESPLEGADO!
   ]
 images:

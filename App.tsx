@@ -155,7 +155,7 @@ const App: React.FC = () => {
       setVms(prevVms => prevVms.map(vm => vm.id === vmId ? { ...vmToStart, status: VMStatus.STOPPED } : vm)); 
       showToast(`Error al iniciar VM '${vmToStart.name}'.`);
       console.error("Error al iniciar VM:", err);
-      if (errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('No autorizado') || errorMessage.includes('sesión expirada')) {
+      if (errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('sesión expirada')) {
         handleLogout();
       }
     }
@@ -214,7 +214,7 @@ const App: React.FC = () => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: response.statusText })); // Intentar parsear el error si es JSON
+        const errorData = await response.json().catch(() => ({ message: response.statusText })); 
         throw new Error(errorData.message || 'Fallo al obtener token de sesión de la aplicación.');
       }
 
@@ -295,7 +295,7 @@ const App: React.FC = () => {
           <AuthButton 
             clientId={GOOGLE_CLIENT_ID}
             onSuccess={handleGoogleAuthSuccess}
-            onError={(err: any) => { // Especificar tipo para 'err'
+            onError={(err: any) => { 
               setError(`Fallo en la autenticación de Google: ${err.message}`);
               showToast("Fallo en el inicio de sesión.");
             }}
