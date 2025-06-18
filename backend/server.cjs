@@ -106,8 +106,6 @@ console.log("zonesClient:", zonesClient ? 'Inicializado' : 'ERROR');
 console.log("zonesClient.list (si existe):", typeof zonesClient.list === 'function' ? 'Function' : 'Undefined/Not a function');
 console.log("globalOperationsClient:", globalOperationsClient ? 'Inicializado' : 'ERROR');
 console.log("globalOperationsClient.wait (si existe):", typeof globalOperationsClient.wait === 'function' ? 'Function' : 'Undefined/Not a function');
-// Eliminado: console.log("imagesClient:", imagesClient ? 'Inicializado' : 'ERROR');
-// Eliminado: console.log("imagesClient.get (si existe):", typeof imagesClient.get === 'function' ? 'Function' : 'Undefined/Not a function');
 console.log("----------------------------------------------------------\n");
 
 /**
