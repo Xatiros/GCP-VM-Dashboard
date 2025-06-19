@@ -20,8 +20,6 @@ export interface VirtualMachine {
   creationTimestamp?: string; 
   osType?: 'Linux' | 'Windows' | 'Other'; 
   diskSizeGb?: string;
-  vCpus?: number; 
-  memoryGb?: number; 
 }
 
 export interface GCPProject {
