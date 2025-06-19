@@ -2,7 +2,7 @@
 # Ubicación: gcp-vm-dashboard/cloudbuild.yaml (en la RAÍZ del proyecto)
 
 steps:
-# --- PASOS PARA EL BACKEND ---
+# --- PASOS PARA EL BACKEND (sin cambios aquí) ---
 # Paso 1 (Backend): Construir la imagen Docker del backend
 - name: 'gcr.io/cloud-builders/docker'
   id: 'build-backend' 
@@ -10,9 +10,9 @@ steps:
     'build', 
     '-t', 
     'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-backend/gcp-vm-dashboard-backend:$COMMIT_SHA', 
-    '.' # Contexto de construcción es la carpeta 'backend'
+    '.' 
   ]
-  dir: 'backend' # <-- ¡IMPORTANTE! El Dockerfile y código del backend están en 'backend/'
+  dir: 'backend' 
 
 # Paso 2 (Backend): Subir la imagen Docker del backend a Artifact Registry
 - name: 'gcr.io/cloud-builders/docker'
@@ -28,13 +28,11 @@ steps:
   id: 'deploy-backend' 
   entrypoint: 'gcloud' 
   args: [
-    'run', 'deploy', 'gcp-vm-dashboard-backend-service', # Nombre del servicio de Cloud Run
+    'run', 'deploy', 'gcp-vm-dashboard-backend-service', 
     '--image', 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-backend/gcp-vm-dashboard-backend:$COMMIT_SHA',
-    '--region', 'europe-southwest1', # Tu región
+    '--region', 'europe-southwest1', 
     '--platform', 'managed',
-    '--allow-unauthenticated', # Permitir invocaciones públicas
-    '--service-account', '780691668337-compute@developer.gserviceaccount.com', 
-    # --- USAR VARIABLES DE SUSTITUCIÓN DE SECRET MANAGER ---
+    '--allow-unauthenticated', 
     '--set-env-vars', 'GOOGLE_CLIENT_ID=${_GOOGLE_CLIENT_ID},JWT_SECRET=${_JWT_SECRET},GCP_PROJECT_ID=${PROJECT_ID}'
   ]
   waitFor: ['push-backend'] 
@@ -48,9 +46,11 @@ steps:
     'build', 
     '-t', 
     'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA', 
-    '.' # <--- CONTEXTO DE CONSTRUCCIÓN ES LA CARPETA 'frontend/'
+    '.' , 
+    # --- ¡CAMBIO CLAVE AQUÍ: PASAR VARIABLE COMO BUILD-ARG! ---
+    '--build-arg', 'VITE_APP_BACKEND_API_BASE_URL=https://gcp-vm-dashboard-backend-service-780691668337.europe-southwest1.run.app/api'
   ]
-  dir: 'frontend' # <-- ¡IMPORTANTE! El Dockerfile y código del frontend están en 'frontend/'
+  dir: 'frontend' # El Dockerfile y código del frontend están en 'frontend/'
 
 # Paso 5 (Frontend): Subir la imagen Docker del frontend a Artifact Registry
 - name: 'gcr.io/cloud-builders/docker'
@@ -66,15 +66,15 @@ steps:
   id: 'deploy-frontend' 
   entrypoint: 'gcloud' 
   args: [
-    'run', 'deploy', 'gcp-vm-dashboard-frontend-service', # <-- ¡Nombre de tu SERVICIO FRONTEND!
+    'run', 'deploy', 'gcp-vm-dashboard-frontend-service', 
     '--image', 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA', 
-    '--region', 'europe-southwest1', # Tu región
+    '--region', 'europe-southwest1', 
     '--platform', 'managed',
-    '--allow-unauthenticated', # Permite acceso público
-    # --- ¡LÍNEA CRÍTICA! Inyectar la URL del BACKEND ---
+    '--allow-unauthenticated', 
+    # --- ¡MANTENER ESTA LÍNEA! Es para las variables de entorno de EJECUCIÓN ---
     '--set-env-vars', 'VITE_APP_BACKEND_API_BASE_URL=https://gcp-vm-dashboard-backend-service-780691668337.europe-southwest1.run.app/api'
   ]
-  waitFor: ['push-frontend', 'deploy-backend'] # Espera a que frontend se suba y backend se despliegue
+  waitFor: ['push-frontend', 'deploy-backend'] 
 
 # --- Definición de Secretos (para el backend) y Opciones Globales ---
 images:
