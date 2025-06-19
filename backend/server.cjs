@@ -10,17 +10,6 @@ const computePackage = require('@google-cloud/compute');
 // Cargar las variables de entorno desde .env lo primero
 dotenv.config();
 
-// --- CAMBIO CLAVE: LOGGING TEMPRANO DE VARIABLES (dentro de server.cjs) ---
-// Esto se ejecutará tan pronto como el script Node.js empiece,
-// capturando las variables después de que dotenv las haya cargado.
-console.log("--- DEBUG server.cjs: Early Environment Variables (after dotenv) ---");
-console.log(`GCP_PROJECT_ID (in server.cjs): '${process.env.GCP_PROJECT_ID}'`);
-console.log(`GOOGLE_CLIENT_ID (in server.cjs): '${process.env.GOOGLE_CLIENT_ID}'`);
-console.log(`JWT_SECRET (in server.cjs): '${process.env.JWT_SECRET ? 'DEFINED (length: ' + process.env.JWT_SECRET.length + ')' : 'UNDEFINED'}'`);
-console.log("--- END DEBUG server.cjs ---");
-// --- FIN CAMBIO CLAVE ---
-
-
 const app = express();
 const port = process.env.PORT || 8080; 
 
@@ -59,9 +48,17 @@ const authenticateToken = (req, res, next) => {
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
       console.error("Error al verificar el token JWT de sesión:", err);
-      return res.status(403).json({ message: 'Token de autenticación inválido o expirado.' });
+      // Si el token expira, es una razón común para reautenticar
+      if (err.name === 'TokenExpiredError') {
+        return res.status(403).json({ message: 'Token de autenticación expirado. Por favor, inicia sesión de nuevo.' });
+      }
+      return res.status(403).json({ message: 'Token de autenticación inválido.' });
     }
     req.user = user;
+    // Actualizar última actividad del usuario si ya está logueado
+    if (userSessions.has(user.id)) {
+        userSessions.get(user.id).lastActivity = new Date();
+    }
     next();
   });
 };
@@ -83,6 +80,24 @@ let zonesClient;
 let globalOperationsClient;
 let imagesClient; 
 let disksClient; 
+
+// --- ALMACÉN EN MEMORIA PARA SESIONES DE USUARIO ---
+// Clave: user.id (payload.sub de Google)
+// Valor: { email: string, name: string, loginTime: Date, lastActivity: Date }
+const userSessions = new Map();
+
+// Opcional: Limpiar sesiones inactivas periódicamente (para evitar que el mapa crezca indefinidamente en memoria)
+setInterval(() => {
+    const now = new Date();
+    const INACTIVITY_THRESHOLD_MS = 2 * 60 * 60 * 1000; // 2 horas de inactividad
+    userSessions.forEach((session, userId) => {
+        if (now.getTime() - session.lastActivity.getTime() > INACTIVITY_THRESHOLD_MS) {
+            console.log(`[Sessions] Eliminando sesión inactiva para: ${session.email}`);
+            userSessions.delete(userId);
+        }
+    });
+}, 30 * 60 * 1000); // Ejecutar cada 30 minutos
+
 
 // Inicialización de clientes de Compute Engine
 try {
@@ -129,7 +144,6 @@ try {
   console.error("Error fatal al inicializar Cliente de Imágenes:", e.message);
 }
 
-// <-- INICIALIZAR disksClient -->
 try {
   if (computePackage.v1 && computePackage.v1.DisksClient && typeof computePackage.v1.DisksClient === 'function') {
     disksClient = new computePackage.v1.DisksClient({ projectId: GCP_PROJECT_ID });
@@ -140,10 +154,8 @@ try {
 } catch (e) {
   console.error("Error fatal al inicializar Cliente de Discos:", e.message);
 }
-// <-- FIN INICIALIZAR disksClient -->
 
 
-// Logs de estado de inicialización
 console.log("\n--- Estado de los clientes de Compute después de la inicialización ---");
 console.log("instancesClient:", instancesClient ? 'Inicializado' : 'ERROR - No inicializado');
 console.log("zonesClient:", zonesClient ? 'Inicializado' : 'ERROR - No inicializado');
@@ -165,7 +177,7 @@ async function getVmOsType(vm) {
     console.warn("[getVmOsType] Advertencia: Clientes de imágenes o discos no están completamente inicializados. No se puede determinar el tipo de SO. Devolviendo 'Unknown'.");
     return 'Unknown';
   }
-  console.log(`[getVmOsType] DEBUG: Clientes ImagesClient(${!!imagesClient}) y DisksClient(${!!disksClient}) inicializados.`);
+  // console.log(`[getVmOsType] DEBUG: Clientes ImagesClient(${!!imagesClient}) y DisksClient(${!!disksClient}) inicializados.`);
 
 
   // Si la VM no tiene un disco de arranque, no podemos determinar el SO a partir de él.
@@ -334,6 +346,15 @@ app.post('/api/auth/google', async (req, res) => {
     const appToken = jwt.sign(user, JWT_SECRET, { expiresIn: '1h' });
 
     console.log(`Usuario autenticado y autorizado: ${user.email}`);
+    // --- REGISTRAR SESIÓN DE USUARIO ---
+    userSessions.set(user.id, {
+        email: user.email,
+        name: user.name,
+        loginTime: new Date(),
+        lastActivity: new Date(),
+    });
+    console.log(`[Sessions] Usuario '${user.email}' inició sesión. Sesiones activas: ${userSessions.size}`);
+    // --- FIN REGISTRO ---
     res.json({ token: appToken, user: { email: user.email, name: user.name } });
 
   } catch (error) {
