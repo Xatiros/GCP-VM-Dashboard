@@ -1,17 +1,17 @@
 // src/components/VMCard.tsx
 import React from 'react';
+// --- INICIO DE MODIFICACIONES: He añadido 'ServerIcon' para la RAM ---
 import { VirtualMachine, VMStatus } from '../types';
-import { PowerIcon, StopIcon, LinkIcon, ChipIcon, LocationMarkerIcon, ClipboardCopyIcon, CogIcon } from './icons'; 
-// Asegúrate de que todos los iconos que usas estén importados correctamente desde './icons'
-// TerminalIcon ha sido eliminado ya que el botón de "Más opciones" se ha unificado con el de "Conectar"
+import { PowerIcon, StopIcon, LinkIcon, ChipIcon, LocationMarkerIcon, ClipboardCopyIcon, CogIcon, ServerIcon } from './icons';
+// --- FIN DE MODIFICACIONES ---
 
 interface VMCardProps {
   vm: VirtualMachine;
   onStartVM: (vmId: string) => void; 
   onStopVM: (vmId:string) => void;   
-  onConnectVM: (vm: VirtualMachine) => void; // onConnectVM para el modal de instrucciones
+  onConnectVM: (vm: VirtualMachine) => void;
   onCopyToClipboard: (text: string, type: string) => void;
-  projectId: string; // Necesario para los enlaces de conexión
+  projectId: string;
 }
 
 const StatusIndicator: React.FC<{ status: VMStatus | string }> = ({ status }) => {
@@ -65,27 +65,21 @@ const StatusIndicator: React.FC<{ status: VMStatus | string }> = ({ status }) =>
 
 
 export const VMCard: React.FC<VMCardProps> = ({ vm, onStartVM, onStopVM, onConnectVM, onCopyToClipboard, projectId }) => {
-  // Estados de la VM unificados
   const isRunning = vm.status === VMStatus.RUNNING || vm.status === 'CORRER';
   const isStopped = vm.status === VMStatus.STOPPED || vm.status === 'FINALIZADO' || vm.status === 'TERMINATED' || vm.status === 'PARADA';
   const isTransitioning = vm.status === 'PROVISIONING' || vm.status === 'SUSPENDING' || vm.status === 'STAGING';
 
-  // Habilitación de acciones
   const canStart = isStopped && !isTransitioning;
   const canStop = isRunning && !isTransitioning;
-  // El botón de conexión ahora solo necesita que la VM esté corriendo y no en transición (la IP externa se valida en el modal)
   const canOpenConnectModal = isRunning && !isTransitioning; 
 
-  // Detección de VM Windows
   const isWindowsVM = vm.osType === 'Windows'; 
 
-  // Función para obtener clases de los botones de Encender/Apagar
   const getActionButtonClass = (isEnabled: boolean, baseColor: string) => 
     `flex-1 inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white transition-colors duration-200 
     ${isEnabled ? `bg-${baseColor}-500 hover:bg-${baseColor}-600 focus:ring-${baseColor}-500` : 'bg-gray-300 text-gray-500 cursor-not-allowed'} 
     focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-50`; 
 
-  // Determinar el texto para el botón deshabilitado (estado de transición o final no accionable)
   const getDisabledButtonText = () => {
     if (vm.status === 'PROVISIONING') return 'Iniciando...';
     if (vm.status === 'SUSPENDING') return 'Deteniendo...';
@@ -102,12 +96,10 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStartVM, onStopVM, onConne
       <div className="p-5 border-b border-gray-200">
         <div className="flex justify-between items-center relative"> 
           <h3 className="text-xl font-bold text-gray-800 truncate" title={vm.name}>{vm.name}</h3>
-          {/* ELIMINADO: Botón de "Más opciones de conexión" (TerminalIcon) */}
-          {/* Ya no es necesario, el botón "Conectar" de abajo lo abre todo */}
         </div>
         <div className="mt-1 flex items-center justify-between">
           <StatusIndicator status={vm.status} />
-          {vm.osType && ( // Mostrar el tipo de OS si está disponible
+          {vm.osType && (
             <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{vm.osType}</span>
           )}
         </div>
@@ -146,24 +138,45 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStartVM, onStopVM, onConne
               <ClipboardCopyIcon className="h-4 w-4" />
             </button>
         </div>
-        {/* AÑADIDO: Mostrar tamaño de disco */}
-        {vm.diskSizeGb && (
-          <div className="flex items-center">
-            <svg className="h-4 w-4 mr-2 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10m0 0h16m0-4V7m0 0L8 15V7h12z" />
-            </svg> {/* Icono de disco genérico si no tienes uno específico */}
-            <span>Tamaño de disco: {vm.diskSizeGb} GB</span>
-          </div>
-        )}
+
+        {/* --- INICIO DE MODIFICACIONES --- */}
+        {/* Agrupamos las especificaciones de hardware para mayor claridad */}
+
         <div className="flex items-center">
           <CogIcon className="h-4 w-4 mr-2 text-gray-400" />
           <span>Tipo: {vm.machineType}</span>
         </div>
+        
+        {vm.diskSizeGb && (
+          <div className="flex items-center">
+            {/* Usamos un icono de disco duro de tu archivo de iconos si existe, o el SVG */}
+            <svg className="h-4 w-4 mr-2 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10m0 0h16M10 7l4 4m0 0l4-4m-4 4v10" />
+            </svg>
+            <span>Disco: {vm.diskSizeGb} GB</span>
+          </div>
+        )}
+
+        {vm.vCpus && (
+          <div className="flex items-center">
+            <ChipIcon className="h-4 w-4 mr-2 text-gray-400" />
+            <span>vCPUs: {vm.vCpus}</span>
+          </div>
+        )}
+        
+        {vm.memoryGb && (
+          <div className="flex items-center">
+            {/* He usado el icono 'ServerIcon' que importamos arriba para representar la RAM */}
+            <ServerIcon className="h-4 w-4 mr-2 text-gray-400" />
+            <span>RAM: {vm.memoryGb} GB</span>
+          </div>
+        )}
+        {/* --- FIN DE MODIFICACIONES --- */}
+
       </div>
 
       <div className="p-4 bg-gray-50 border-t border-gray-200">
-        <div className="flex space-x-2"> {/* Fila principal de botones */}
-          {/* Botón Encender */}
+        <div className="flex space-x-2">
           <button
             onClick={() => onStartVM(vm.id)} 
             disabled={!canStart}
@@ -173,7 +186,6 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStartVM, onStopVM, onConne
             Encender
           </button>
 
-          {/* Botón Apagar */}
           <button
             onClick={() => onStopVM(vm.id)} 
             disabled={!canStop}
@@ -183,14 +195,13 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStartVM, onStopVM, onConne
             Apagar
           </button>
           
-          {/* BOTÓN CONECTAR - AHORA SIEMPRE ABRE EL MODAL DE INSTRUCCIONES */}
           <button 
-            onClick={() => onConnectVM(vm)} // Llama a onConnectVM para abrir el modal
-            disabled={!canOpenConnectModal} // Habilita/deshabilita el botón según si se puede conectar
+            onClick={() => onConnectVM(vm)}
+            disabled={!canOpenConnectModal}
             className={`flex-1 inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm transition-colors duration-200
               ${canOpenConnectModal 
-                ? 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500' // Estilo activo
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed' // Estilo deshabilitado
+                ? 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-50`}
             title={canOpenConnectModal ? "Ver instrucciones de conexión" : "La VM debe estar en estado RUNNING para ver las instrucciones"}
           >
@@ -199,7 +210,6 @@ export const VMCard: React.FC<VMCardProps> = ({ vm, onStartVM, onStopVM, onConne
           </button>
         </div>
 
-        {/* Botón de estado deshabilitado (si la VM está en transición) */}
         { isTransitioning && ( 
           <div className="flex space-x-2 mt-2 w-full"> 
               <div
