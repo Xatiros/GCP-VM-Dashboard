@@ -10,13 +10,15 @@ const computePackage = require('@google-cloud/compute');
 // Cargar las variables de entorno desde .env lo primero
 dotenv.config();
 
-// --- CAMBIO CLAVE: LOGGING TEMPRANO DE VARIABLES (dentro de server.cjs) ---
+// --- DEBUG server.cjs: LOGGING TEMPRANO DE VARIABLES (¡TEMPORAL PARA DEPURACIÓN!) ---
+// Esto se ejecuta tan pronto como el script Node.js empiece,
+// capturando las variables después de que dotenv las haya cargado.
 console.log("--- DEBUG server.cjs: Early Environment Variables (after dotenv) ---");
 console.log(`GCP_PROJECT_ID (in server.cjs): '${process.env.GCP_PROJECT_ID}'`);
 console.log(`GOOGLE_CLIENT_ID (in server.cjs): '${process.env.GOOGLE_CLIENT_ID}'`);
 console.log(`JWT_SECRET (in server.cjs): '${process.env.JWT_SECRET ? 'DEFINED (length: ' + process.env.JWT_SECRET.length + ')' : 'UNDEFINED'}'`);
 console.log("--- END DEBUG server.cjs ---");
-// --- FIN CAMBIO CLAVE ---
+// --- FIN DEBUG TEMPORAL ---
 
 const app = express();
 const port = process.env.PORT || 8080; 
@@ -90,18 +92,21 @@ let imagesClient;
 let disksClient; 
 
 // --- ALMACÉN EN MEMORIA PARA SESIONES DE USUARIO ---
+// Clave: user.id (payload.sub de Google)
+// Valor: { email: string, name: string, loginTime: Date, lastActivity: Date }
 const userSessions = new Map();
 
+// Opcional: Limpiar sesiones inactivas periódicamente (para evitar que el mapa crezca indefinidamente en memoria)
 setInterval(() => {
     const now = new Date();
-    const INACTIVITY_THRESHOLD_MS = 2 * 60 * 60 * 1000; 
+    const INACTIVITY_THRESHOLD_MS = 2 * 60 * 60 * 1000; // 2 horas de inactividad
     userSessions.forEach((session, userId) => {
         if (now.getTime() - session.lastActivity.getTime() > INACTIVITY_THRESHOLD_MS) {
             console.log(`[Sessions] Eliminando sesión inactiva para: ${session.email}`);
             userSessions.delete(userId);
         }
     });
-}, 30 * 60 * 1000); 
+}, 30 * 60 * 1000); // Ejecutar cada 30 minutos
 
 
 // Inicialización de clientes de Compute Engine
