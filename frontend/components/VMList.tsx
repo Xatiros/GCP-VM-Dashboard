@@ -1,8 +1,9 @@
-// src/components/VMList.tsx
+// frontend/components/VMList.tsx
+// Ubicación: gcp-vm-dashboard/frontend/components/VMList.tsx
 
 import React from 'react';
-import { VirtualMachine } from '../types';
-import { VMCard } from './VMCard';
+import { VirtualMachine } from '../types'; // Importación relativa desde frontend/types.ts
+import { VMCard } from './VMCard'; // Importación relativa desde frontend/components/VMCard.tsx
 
 interface VMListProps {
   vms: VirtualMachine[];
@@ -29,10 +30,9 @@ export const VMList: React.FC<VMListProps> = ({ vms, onStartVM, onStopVM, onConn
         <VMCard 
             key={vm.id} 
             vm={vm} 
-            // ¡¡¡CAMBIO AQUÍ: Coincidir nombres de props con VMCard.tsx!!!
-            onStartVM={() => onStartVM(vm.id)}   // <-- Ahora se pasa como onStartVM
-            onStopVM={() => onStopVM(vm.id)}     // <-- Ahora se pasa como onStopVM
-            onConnectVM={onConnectVM}            // <-- Ahora se pasa como onConnectVM
+            onStartVM={() => onStartVM(vm.id)}   
+            onStopVM={() => onStopVM(vm.id)}     
+            onConnectVM={onConnectVM}            
             onCopyToClipboard={onCopyToClipboard}
             projectId={projectId} 
         />

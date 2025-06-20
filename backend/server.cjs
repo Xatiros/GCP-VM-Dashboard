@@ -1,4 +1,6 @@
 // backend/server.cjs
+// Ubicación: gcp-vm-dashboard/backend/server.cjs
+
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
@@ -10,13 +12,13 @@ const computePackage = require('@google-cloud/compute');
 // Cargar las variables de entorno desde .env lo primero
 dotenv.config();
 
-// --- CAMBIO CLAVE: LOGGING TEMPRANO DE VARIABLES (dentro de server.cjs) ---
+// --- DEBUG server.cjs: LOGGING TEMPRANO DE VARIABLES (¡TEMPORAL PARA DEPURACIÓN!) ---
 console.log("--- DEBUG server.cjs: Early Environment Variables (after dotenv) ---");
 console.log(`GCP_PROJECT_ID (in server.cjs): '${process.env.GCP_PROJECT_ID}'`);
 console.log(`GOOGLE_CLIENT_ID (in server.cjs): '${process.env.GOOGLE_CLIENT_ID}'`);
 console.log(`JWT_SECRET (in server.cjs): '${process.env.JWT_SECRET ? 'DEFINED (length: ' + process.env.JWT_SECRET.length + ')' : 'UNDEFINED'}'`);
 console.log("--- END DEBUG server.cjs ---");
-// --- FIN CAMBIO CLAVE ---
+// --- FIN DEBUG TEMPORAL ---
 
 const app = express();
 const port = process.env.PORT || 8080; 
@@ -56,7 +58,7 @@ const authenticateToken = (req, res, next) => {
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
       console.error("Error al verificar el token JWT de sesión:", err);
-      // Si el token expira, es una razón común para reautenticar
+      // Si el token expira, es una razón común para reautentizar
       if (err.name === 'TokenExpiredError') {
         return res.status(403).json({ message: 'Token de autenticación expirado. Por favor, inicia sesión de nuevo.' });
       }

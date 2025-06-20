@@ -1,4 +1,6 @@
 // frontend/App.tsx
+// Ubicación: gcp-vm-dashboard/frontend/App.tsx
+
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Header } from './components/Header';
 import { VMList } from './components/VMList';
@@ -6,7 +8,6 @@ import { ConnectModal } from './components/ConnectModal';
 import { Spinner } from './components/Spinner';
 import { Toast } from './components/Toast';
 import { VirtualMachine, VMStatus, GCPProject } from './types';
-// Importamos las funciones de servicio que ahora usan la URL dinámica
 import { fetchVMs as apiFetchVMs, startVM as apiStartVM, stopVM as apiStopVM } from './services/vmService';
 import { RefreshIcon, SearchIcon, CogIcon } from './components/icons'; 
 import { AuthButton } from './components/AuthButton';
@@ -86,7 +87,7 @@ const App: React.FC = () => {
       setError(`No se pudieron cargar las máquinas virtuales: ${errorMessage}. Inténtalo de nuevo.`);
       console.error("Error al cargar VMs en el frontend:", err);
       showToast('Error al cargar VMs.');
-      if (errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('No autorizado') || errorMessage.includes('sesión expirada')) {
+      if (errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('sesión expirada')) {
         showToast("Sesión expirada o no autorizada. Por favor, inicie sesión de nuevo.");
         handleLogout();
       }
