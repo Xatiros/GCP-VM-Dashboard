@@ -1,6 +1,4 @@
 // backend/server.cjs
-// Ubicación: gcp-vm-dashboard/backend/server.cjs
-
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
@@ -47,6 +45,14 @@ if (!JWT_SECRET || JWT_SECRET.length < 32) {
 }
 // --- FIN VALIDACIÓN ---
 
+// --- ROLES DE USUARIO: Lista de correos electrónicos de administradores ---
+// ¡IMPORTANTE! Reemplaza con los correos electrónicos de tus administradores reales.
+const ADMIN_EMAILS = [
+    'christian.sanchez@gemigeo.com', // Ejemplo
+    'carlos.micucci@gemigeo.com'
+];
+
+// --- Middleware de Autenticación y Asignación de Roles ---
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -58,13 +64,16 @@ const authenticateToken = (req, res, next) => {
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
       console.error("Error al verificar el token JWT de sesión:", err);
-      // Si el token expira, es una razón común para reautentizar
       if (err.name === 'TokenExpiredError') {
         return res.status(403).json({ message: 'Token de autenticación expirado. Por favor, inicia sesión de nuevo.' });
       }
       return res.status(403).json({ message: 'Token de autenticación inválido.' });
     }
     req.user = user;
+    // Asignar rol basado en el email del usuario
+    req.user.role = ADMIN_EMAILS.includes(user.email) ? 'admin' : 'user';
+    console.log(`[Auth] Usuario ${user.email} autenticado con rol: ${req.user.role}`);
+
     // Actualizar última actividad del usuario si ya está logueado
     if (userSessions.has(user.id)) {
         userSessions.get(user.id).lastActivity = new Date();
@@ -72,6 +81,18 @@ const authenticateToken = (req, res, next) => {
     next();
   });
 };
+
+// --- Nuevo Middleware de Autorización por Rol ---
+const authorizeRole = (requiredRole) => {
+    return (req, res, next) => {
+        if (!req.user || req.user.role !== requiredRole) {
+            console.warn(`[AuthZ] Acceso denegado para ${req.user ? req.user.email : 'usuario no autenticado'}. Rol '${req.user ? req.user.role : 'ninguno'}' no es '${requiredRole}'.`);
+            return res.status(403).json({ message: `Acceso denegado. Se requiere el rol: ${requiredRole}.` });
+        }
+        next();
+    };
+};
+
 
 app.use(cors({
   origin: [
@@ -96,14 +117,14 @@ const userSessions = new Map();
 
 setInterval(() => {
     const now = new Date();
-    const INACTIVITY_THRESHOLD_MS = 2 * 60 * 60 * 1000; 
+    const INACTIVITY_THRESHOLD_MS = 2 * 60 * 60 * 1000; // 2 horas de inactividad
     userSessions.forEach((session, userId) => {
         if (now.getTime() - session.lastActivity.getTime() > INACTIVITY_THRESHOLD_MS) {
             console.log(`[Sessions] Eliminando sesión inactiva para: ${session.email}`);
             userSessions.delete(userId);
         }
     });
-}, 30 * 60 * 1000); 
+}, 30 * 60 * 1000); // Ejecutar cada 30 minutos
 
 
 // Inicialización de clientes de Compute Engine
@@ -608,7 +629,7 @@ app.post('/api/vms/stop/:vmId', authenticateToken, async (req, res) => {
     if (actualStatusFromGCP === 'STOPPED' || actualStatusFromGCP === 'TERMINATED' || actualStatusFromGCP === 'SUSPENDING' || actualStatusFromGCP === 'PARADA') {
         statusToReturn = 'STOPPED';
     } else if (actualStatusFromGCP === 'PROVISIONING' || actualStatusFromGCP === 'STAGING' || actualStatusFromGCP === 'RUNNING' || actualStatusFromGCP === 'CORRER') {
-        if (actualStatusFromGCP === 'CORRER') {
+        if (actualStatusFromGTP === 'CORRER') { // Corrected from actualStatusFromGCP
             statusToReturn = 'RUNNING';
         }
     }
