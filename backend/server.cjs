@@ -17,26 +17,41 @@ const PORT = process.env.PORT || 8080;
 const ALLOWED_DOMAIN = 'gemigeo.com';
 const ADMIN_EMAILS = ['christian.sanchez@gemigeo.com', 'carlos.micucci@gemigeo.com'];
 
-// Función de validación de arranque
-function validateEnvironmentVariables() {
-    console.log("--- Validando variables de entorno críticas ---");
-    if (!GCP_PROJECT_ID) {
-        console.error("Error fatal: GCP_PROJECT_ID no está definido.");
-        process.exit(1);
-    }
-    if (!GOOGLE_CLIENT_ID) {
-        console.error("Error fatal: GOOGLE_CLIENT_ID no está definido.");
-        process.exit(1);
-    }
-    if (!JWT_SECRET || JWT_SECRET.length < 32) {
-        console.error("Error fatal: JWT_SECRET no está definido o es demasiado corto.");
-        process.exit(1);
-    }
-    console.log("--- Todas las variables de entorno críticas están presentes. ---");
-}
+let criticalEnvsValid = false;
 
-// Validar antes de hacer nada más
-validateEnvironmentVariables();
+// --- VERSIÓN DE DEPURACIÓN: Esta función ahora no detiene el proceso ---
+function validateEnvironmentVariables() {
+    let allVarsPresent = true;
+    console.log("--- [DEBUG] Iniciando validación de variables de entorno críticas ---");
+
+    if (!GCP_PROJECT_ID) {
+        console.error("!!! ATENCIÓN: La variable de entorno GCP_PROJECT_ID no está definida. !!!");
+        allVarsPresent = false;
+    } else {
+        console.log("    [DEBUG] GCP_PROJECT_ID: OK");
+    }
+
+    if (!GOOGLE_CLIENT_ID) {
+        console.error("!!! ATENCIÓN: La variable de entorno GOOGLE_CLIENT_ID no está definida. !!!");
+        allVarsPresent = false;
+    } else {
+        console.log("    [DEBUG] GOOGLE_CLIENT_ID: OK");
+    }
+
+    if (!JWT_SECRET || JWT_SECRET.length < 32) {
+        console.error("!!! ATENCIÓN: JWT_SECRET no está definido o es demasiado corto. !!!");
+        allVarsPresent = false;
+    } else {
+        console.log("    [DEBUG] JWT_SECRET: OK");
+    }
+
+    if (!allVarsPresent) {
+         console.error("--- [DEBUG] Faltan una o más variables críticas. La inicialización de clientes de GCP se omitirá. ---");
+    } else {
+        console.log("--- [DEBUG] Todas las variables de entorno críticas están presentes. ---");
+    }
+    criticalEnvsValid = allVarsPresent;
+}
 
 // --- INICIALIZACIÓN DE EXPRESS ---
 const app = express();
@@ -55,6 +70,12 @@ const userSessions = new Map();
 
 // --- FUNCIÓN DE INICIALIZACIÓN ASÍNCRONA ---
 async function initializeGoogleCloudClients() {
+    // Solo intentar si la validación inicial pasó
+    if (!criticalEnvsValid) {
+        console.warn("--- [WARN] Omitiendo inicialización de clientes de GCP debido a que faltan variables de entorno. Las rutas de la API de VMs no funcionarán. ---");
+        return false;
+    }
+
     try {
         console.log("\n--- Inicializando clientes de Google Cloud Compute ---");
         instancesClient = new computePackage.v1.InstancesClient({ projectId: GCP_PROJECT_ID });
@@ -65,7 +86,6 @@ async function initializeGoogleCloudClients() {
         console.log("--- ¡Todos los clientes de Google Cloud se han inicializado correctamente! ---\n");
         return true;
     } catch (error) {
-        // Este log AHORA SÍ aparecerá en Cloud Run si algo falla
         console.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
         console.error("!!! ERROR FATAL AL INICIALIZAR LOS CLIENTES DE GCP !!!");
         console.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
@@ -78,7 +98,7 @@ async function initializeGoogleCloudClients() {
 
 
 // --- LÓGICA DE LA APLICACIÓN (MIDDLEWARES, FUNCIONES, RUTAS) ---
-
+// (El resto del código de tus rutas y funciones va aquí sin cambios)
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -122,17 +142,13 @@ async function getVmOsType(vm) {
         if (licenseLower.includes('windows')) return 'Windows';
         if (licenseLower.includes('linux') || licenseLower.includes('debian') || licenseLower.includes('ubuntu')) return 'Linux';
     }
-    // ... tu lógica más compleja de getVmOsType aquí ...
     return 'Unknown';
 }
 
-
-// Ruta de Health Check simple
 app.get('/', (req, res) => {
   res.status(200).send('Backend server is running and ready.');
 });
 
-// Ruta de autenticación
 app.post('/api/auth/google', async (req, res) => {
     const { id_token } = req.body;
     if (!id_token) return res.status(400).json({ message: 'Falta el ID Token.' });
@@ -148,7 +164,6 @@ app.post('/api/auth/google', async (req, res) => {
         const user = { id: payload.sub, email: payload.email, name: payload.name };
         const appToken = jwt.sign(user, JWT_SECRET, { expiresIn: '2h' });
         userSessions.set(user.id, { email: user.email, name: user.name, lastActivity: new Date() });
-        console.log(`[Sessions] Usuario '${user.email}' inició sesión. Sesiones activas: ${userSessions.size}`);
         res.json({ token: appToken, user: { email: user.email, name: user.name, role: ADMIN_EMAILS.includes(user.email) ? 'admin' : 'user' } });
     } catch (error) {
         console.error("Error al verificar el ID Token de Google:", error.message);
@@ -156,8 +171,6 @@ app.post('/api/auth/google', async (req, res) => {
     }
 });
 
-
-// Rutas de API para VMs (Protegidas)
 app.get('/api/vms/:projectId', authenticateToken, async (req, res) => {
     if (!instancesClient) return res.status(503).json({ message: "Servidor no listo, clientes GCP no disponibles." });
     const { projectId } = req.params;
@@ -175,7 +188,6 @@ app.get('/api/vms/:projectId', authenticateToken, async (req, res) => {
             status: vm.status,
             zone: vm.zone.split('/').pop(),
             externalIp: vm.networkInterfaces?.[0]?.accessConfigs?.[0]?.natIP,
-            // ... resto de tu lógica de mapeo
             osType: await getVmOsType(vm),
         })));
         res.json(mappedVms);
@@ -214,29 +226,32 @@ app.post('/api/vms/stop/:vmId', authenticateToken, async (req, res) => {
 
 // --- FUNCIÓN PRINCIPAL DE ARRANQUE ---
 async function startServer() {
-    // 1. Iniciar el servidor Express y empezar a escuchar
+    // Validar las variables al inicio
+    validateEnvironmentVariables();
+
+    // Iniciar el servidor Express y empezar a escuchar
     app.listen(PORT, () => {
         console.log(`✅ Servidor Express iniciado y escuchando en el puerto ${PORT}`);
         console.log("   El endpoint de health check está activo.");
         console.log("   El siguiente paso es inicializar los clientes de Google Cloud...");
         
-        // 2. DESPUÉS de que el servidor escuche, inicializa los clientes
         initializeGoogleCloudClients();
     });
 
     // Limpieza de sesiones inactivas
     setInterval(() => {
         const now = new Date();
-        const INACTIVITY_THRESHOLD_MS = 2 * 60 * 60 * 1000; // 2 horas
+        const INACTIVITY_THRESHOLD_MS = 2 * 60 * 60 * 1000;
         userSessions.forEach((session, userId) => {
             if (now.getTime() - (session.lastActivity?.getTime() || 0) > INACTIVITY_THRESHOLD_MS) {
                 console.log(`[Sessions] Eliminando sesión inactiva para: ${session.email}`);
                 userSessions.delete(userId);
             }
         });
-    }, 30 * 60 * 1000); // Cada 30 minutos
+    }, 30 * 60 * 1000);
 }
 
 // ¡Ejecutar la función de arranque!
 startServer();
+
 
