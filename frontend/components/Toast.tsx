@@ -34,14 +34,6 @@ export const Toast: React.FC<ToastProps> = ({ message, type = 'info', onClose })
     >
       <IconComponent className="h-6 w-6 mr-3" />
       <span>{message}</span>
-       {/* Add this to your tailwind.config.js or global styles if not using CDN config for keyframes
-      @keyframes fadeIn { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(0); } }
-      @keyframes fadeOut { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(20px); } } 
-      Since we use CDN, we might need to embed this style or use simpler transitions.
-      For simplicity, removing complex animation from here if it requires config.
-      Tailwind by default doesn't have these keyframes easily.
-      A simple opacity transition could be used.
-      */}
     </div>
   );
 };
