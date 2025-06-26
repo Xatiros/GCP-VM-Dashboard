@@ -1,14 +1,15 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "main": "index.js",
+  "description": "",
+  "main": "server.cjs",
   "scripts": {
+    "start": "node server.cjs",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
   "dependencies": {
     "@google-cloud/compute": "^5.2.0",
     "cors": "^2.8.5",
@@ -18,3 +19,4 @@
     "jsonwebtoken": "^9.0.2"
   }
 }
+
