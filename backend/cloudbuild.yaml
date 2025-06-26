@@ -1,10 +1,9 @@
 # backend/cloudbuild.yaml
-# Versión final y corregida
+# Versión final y correcta.
 
 steps:
-  # Paso 1: Construir la imagen Docker del backend
+  # Paso 1: Construir la imagen Docker
   - name: 'gcr.io/cloud-builders/docker'
-    id: 'Build Backend Image'
     args:
       - 'build'
       - '-t'
@@ -12,16 +11,14 @@ steps:
       - '.'
     dir: 'backend'
 
-  # Paso 2: Subir la imagen Docker a Artifact Registry
+  # Paso 2: Subir la imagen a Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
-    id: 'Push Backend Image'
     args:
       - 'push'
       - 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-repo/gcp-vm-dashboard-backend-service:$COMMIT_SHA'
 
-  # Paso 3: Desplegar la imagen en Cloud Run con los secretos correctos
+  # Paso 3: Desplegar en Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: 'Deploy to Cloud Run'
     entrypoint: 'gcloud'
     args:
       - 'run'
@@ -36,19 +33,14 @@ steps:
       - '--allow-unauthenticated'
       - '--service-account'
       - '780691668337-compute@developer.gserviceaccount.com'
-      # Pasamos las variables de entorno, usando las sustituciones de los secretos definidos abajo
       - '--set-env-vars'
       - 'GOOGLE_CLIENT_ID=${_GOOGLE_CLIENT_ID},JWT_SECRET=${_JWT_SECRET},GCP_PROJECT_ID=$PROJECT_ID'
-    # --- LÍNEA ELIMINADA ---
-    # La clave 'secretEnv' se ha eliminado de este paso porque ya usamos 'availableSecrets' abajo.
 
-# --- Sección de secretos disponibles para TODO el proceso de build ---
-# Esta es la única sección que necesitamos para manejar los secretos.
+# --- Sección de secretos disponibles para el build ---
 availableSecrets:
   secretManager:
     - versionName: projects/$PROJECT_ID/secrets/my-google-client-id/versions/latest
       env: '_GOOGLE_CLIENT_ID'
-
     - versionName: projects/$PROJECT_ID/secrets/my-backend-jwt-secret/versions/latest
       env: '_JWT_SECRET'
 
@@ -57,6 +49,7 @@ images:
 
 options:
   logging: CLOUD_LOGGING_ONLY
+
 
 
 
