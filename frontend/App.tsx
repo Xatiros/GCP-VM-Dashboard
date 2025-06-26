@@ -9,7 +9,7 @@ import { Spinner } from './components/Spinner';
 import { Toast } from './components/Toast';
 import { VirtualMachine, VMStatus, GCPProject } from './types';
 import { fetchVMs as apiFetchVMs, startVM as apiStartVM, stopVM as apiStopVM } from './services/vmService';
-import { RefreshIcon, SearchIcon, CogIcon } from './components/icons'; 
+import { RefreshIcon, SearchIcon } from './components/icons'; 
 import { AuthButton } from './components/AuthButton';
 
 // Define la URL base de la API del backend.
@@ -38,7 +38,7 @@ const App: React.FC = () => {
 
   const [appToken, setAppToken] = useState<string | null>(localStorage.getItem('appToken'));
   const [userEmail, setUserEmail] = useState<string | null>(localStorage.getItem('userEmail'));
-  const [userRole, setUserRole] = useState<string | null>(null); // <-- NUEVO ESTADO PARA EL ROL
+  const [userRole, setUserRole] = useState<string | null>(localStorage.getItem('userRole'));
   const [isAuthenticating, setIsAuthenticating] = useState(false);
 
   const GCP_PROJECT_ID_REAL = 'puestos-de-trabajo-potentes'; 
@@ -107,19 +107,11 @@ const App: React.FC = () => {
   }, [loadVMs]);
 
   useEffect(() => {
-    // Intentar cargar el rol del usuario desde localStorage al inicio
-    const storedRole = localStorage.getItem('userRole');
-    if (storedRole) {
-      setUserRole(storedRole);
-    }
-
     if (appToken) { 
       loadVMs(); 
-      showToast(`Actualización global de VMs cada ${GLOBAL_POLLING_INTERVAL_MS / 1000} segundos iniciada.`);
       const globalIntervalId = setInterval(loadVMs, GLOBAL_POLLING_INTERVAL_MS);
       return () => {
         clearInterval(globalIntervalId);
-        showToast("Actualización global de VMs detenida.");
       };
     } else {
       setVms([]);
@@ -159,8 +151,7 @@ const App: React.FC = () => {
       setError(`Fallo al iniciar VM '${vmToStart.name}': ${errorMessage}.`);
       setVms(prevVms => prevVms.map(vm => vm.id === vmId ? { ...vmToStart, status: VMStatus.STOPPED } : vm)); 
       showToast(`Error al iniciar VM '${vmToStart.name}'.`);
-      console.error("Error al iniciar VM:", err);
-      if (errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('sesión expirada')) {
+      if (errorMessage.includes('401') || errorMessage.includes('403')) {
         handleLogout();
       }
     }
@@ -170,7 +161,7 @@ const App: React.FC = () => {
     const vmToStop = vms.find(vm => vm.id === vmId);
     if (!vmToStop || !appToken) return;
 
-    if (!window.confirm(`¿Estás seguro de que quieres DETENER la VM '${vmToStop.name}'? Esto podría interrumpir servicios.`)) {
+    if (!window.confirm(`¿Estás seguro de que quieres DETENER la VM '${vmToStop.name}'?`)) {
       return;
     }
     setVms(prevVms => prevVms.map(vm => vm.id === vmId ? { ...vm, status: VMStatus.SUSPENDING } : vm));
@@ -178,7 +169,6 @@ const App: React.FC = () => {
     try {
       const updatedVM = await apiStopVM(vmId, vmToStop.zone, selectedProject.id, appToken); 
       setVms(prevVms => prevVms.map(vm => vm.id === vmId ? updatedVM : vm));
-
       startTransitionPolling(vmId);
 
     } catch (err: any) {
@@ -186,8 +176,7 @@ const App: React.FC = () => {
       setError(`Fallo al detener VM '${vmToStop.name}': ${errorMessage}.`);
       setVms(prevVms => prevVms.map(vm => vm.id === vmId ? { ...vmToStop, status: VMStatus.RUNNING } : vm)); 
       showToast(`Error al detener VM '${vmToStop.name}'.`);
-      console.error("Error al detener VM:", err);
-      if (errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('sesión expirada')) {
+      if (errorMessage.includes('401') || errorMessage.includes('403')) {
         handleLogout();
       }
     }
@@ -226,17 +215,16 @@ const App: React.FC = () => {
       const data = await response.json();
       localStorage.setItem('appToken', data.token); 
       localStorage.setItem('userEmail', data.user.email); 
-      localStorage.setItem('userRole', data.user.role); // <-- GUARDAR EL ROL EN LOCALSTORAGE
+      localStorage.setItem('userRole', data.user.role);
       setAppToken(data.token);
       setUserEmail(data.user.email);
-      setUserRole(data.user.role); // <-- ACTUALIZAR EL ESTADO DEL ROL
+      setUserRole(data.user.role);
       showToast(`Bienvenido, ${data.user.name || data.user.email}!`);
 
     } catch (err: any) {
       const errorMessage = err.message || 'Error desconocido de autenticación.';
       setError(`Error de autenticación: ${errorMessage}`);
       showToast('Error en el inicio de sesión con Google.');
-      console.error("Error en handleGoogleAuthSuccess:", err);
     } finally {
       setIsAuthenticating(false);
     }
@@ -245,10 +233,10 @@ const App: React.FC = () => {
   const handleLogout = () => {
     localStorage.removeItem('appToken');
     localStorage.removeItem('userEmail');
-    localStorage.removeItem('userRole'); // <-- ELIMINAR EL ROL DE LOCALSTORAGE
+    localStorage.removeItem('userRole');
     setAppToken(null); 
     setUserEmail(null);
-    setUserRole(null); // <-- LIMPIAR EL ESTADO DEL ROL
+    setUserRole(null);
     setVms([]); 
     showToast('Sesión cerrada.');
   };
@@ -266,33 +254,7 @@ const App: React.FC = () => {
         const zoneMatch = zoneFilter === 'ALL' || vm.zone === zoneFilter;
         return nameMatch && statusMatch && zoneMatch;
       })
-      .sort((a, b) => {
-        const nameA = a.name.toLowerCase();
-        const nameB = b.name.toLowerCase();
-
-        const partsA = nameA.split(/(\d+)/).filter(Boolean); 
-        const partsB = nameB.split(/(\d+)/).filter(Boolean);
-
-        for (let i = 0; i < Math.min(partsA.length, partsB.length); i++) {
-          const partA = partsA[i];
-          const partB = partsB[i];
-
-          const isNumA = !isNaN(Number(partA));
-          const isNumB = !isNaN(Number(partB));
-
-          if (isNumA && isNumB) {
-            const numA = Number(partA);
-            const numB = Number(partB);
-            if (numA !== numB) {
-              return numA - numB;
-            }
-          } else {
-            if (partA < partB) return -1;
-            if (partA > partB) return 1;
-          }
-        }
-        return partsA.length - partsB.length; 
-      });
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
   }, [vms, searchTerm, statusFilter, zoneFilter]);
 
   if (!appToken) { 
@@ -316,14 +278,14 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-gray-50">
       <Header 
         appName="Cloud VM Manager" 
         projects={ALL_PROJECTS}
         selectedProject={selectedProject}
         onProjectChange={setSelectedProject}
         userEmail={userEmail}
-        userRole={userRole} {/* <-- PASAR EL ROL AL HEADER */}
+        userRole={userRole}
         onLogout={handleLogout}
       />
       <main className="flex-grow p-4 md:p-6 lg:p-8">
@@ -379,14 +341,14 @@ const App: React.FC = () => {
                   ))}
                 </select>
               </div>
-              <div className="mt-4 md:mt-0 md:col-start-2 lg:col-start-auto">
+              <div className="md:col-start-2 lg:col-start-auto">
                    <button
                      onClick={loadVMs} 
                      disabled={isLoading}
                      className="w-full flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:opacity-50"
                    >
                      <RefreshIcon className={`h-5 w-5 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-                     Actualizar máquinas virtuales
+                     Actualizar VMs
                    </button>
               </div>
             </div>
