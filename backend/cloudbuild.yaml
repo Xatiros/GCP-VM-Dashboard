@@ -10,7 +10,7 @@ steps:
       - '-t'
       - 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-repo/gcp-vm-dashboard-backend-service:$COMMIT_SHA'
       - '.'
-    dir: 'backend' # Correcto: El comando se ejecuta desde la carpeta del backend
+    dir: 'backend'
 
   # Paso 2: Subir la imagen Docker a Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
@@ -36,28 +36,28 @@ steps:
       - '--allow-unauthenticated'
       - '--service-account'
       - '780691668337-compute@developer.gserviceaccount.com'
-      # --- CORRECCIÓN CLAVE ---
-      # Usamos --update-env-vars que es más seguro y la sintaxis está limpia.
-      # Cloud Build reemplazará ${_GOOGLE_CLIENT_ID} y ${_JWT_SECRET} con los valores de los secretos.
-      - '--update-env-vars'
-      - 'GCP_PROJECT_ID=$PROJECT_ID,GOOGLE_CLIENT_ID=${_GOOGLE_CLIENT_ID},JWT_SECRET=${_JWT_SECRET}'
+      # Pasamos las variables de entorno, usando las sustituciones de los secretos definidos abajo
+      - '--set-env-vars'
+      - 'GOOGLE_CLIENT_ID=${_GOOGLE_CLIENT_ID},JWT_SECRET=${_JWT_SECRET},GCP_PROJECT_ID=$PROJECT_ID'
+    # --- LÍNEA ELIMINADA ---
+    # La clave 'secretEnv' se ha eliminado de este paso porque ya usamos 'availableSecrets' abajo.
 
 # --- Sección de secretos disponibles para TODO el proceso de build ---
-# Esta es la forma correcta y moderna de definir los secretos.
+# Esta es la única sección que necesitamos para manejar los secretos.
 availableSecrets:
   secretManager:
-    # Asegúrate de que el nombre del secreto ('my-google-client-id') es EXACTO
     - versionName: projects/$PROJECT_ID/secrets/my-google-client-id/versions/latest
-      env: '_GOOGLE_CLIENT_ID' # Se crea la variable de sustitución _GOOGLE_CLIENT_ID
+      env: '_GOOGLE_CLIENT_ID'
 
-    # Asegúrate de que el nombre del secreto ('my-backend-jwt-secret') es EXACTO
     - versionName: projects/$PROJECT_ID/secrets/my-backend-jwt-secret/versions/latest
-      env: '_JWT_SECRET' # Se crea la variable de sustitución _JWT_SECRET
+      env: '_JWT_SECRET'
 
 images:
   - 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-repo/gcp-vm-dashboard-backend-service:$COMMIT_SHA'
 
 options:
   logging: CLOUD_LOGGING_ONLY
+
+
 
 
