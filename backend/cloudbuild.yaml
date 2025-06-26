@@ -1,48 +1,63 @@
 # backend/cloudbuild.yaml
+# Versión final y corregida
+
 steps:
-# Paso 1: Construir la imagen Docker del backend
-- name: 'gcr.io/cloud-builders/docker'
-  args: [
-    'build', 
-    '-t', 
-    'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-backend/gcp-vm-dashboard-backend:$COMMIT_SHA', 
-    '.'
-  ]
-  dir: 'backend' # Importante: Indica que el Dockerfile está en la carpeta 'backend'
+  # Paso 1: Construir la imagen Docker del backend
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'Build Backend Image'
+    args:
+      - 'build'
+      - '-t'
+      - 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-repo/gcp-vm-dashboard-backend-service:$COMMIT_SHA'
+      - '.'
+    dir: 'backend' # Correcto: El comando se ejecuta desde la carpeta del backend
 
-# Paso 2: Subir la imagen Docker a Artifact Registry
-- name: 'gcr.io/cloud-builders/docker'
-  args: [
-    'push', 
-    'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-backend/gcp-vm-dashboard-backend:$COMMIT_SHA'
-  ]
+  # Paso 2: Subir la imagen Docker a Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'Push Backend Image'
+    args:
+      - 'push'
+      - 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-repo/gcp-vm-dashboard-backend-service:$COMMIT_SHA'
 
-# Paso 3: Desplegar la imagen en Cloud Run
-- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-  entrypoint: 'gcloud' 
-  args: [
-    'run', 'deploy', 'gcp-vm-dashboard-backend-service', # Nombre del servicio de Cloud Run
-    '--image', 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-backend/gcp-vm-dashboard-backend:$COMMIT_SHA',
-    '--region', 'europe-southwest1', # Tu región
-    '--platform', 'managed',
-    '--allow-unauthenticated', # Permitir invocaciones públicas
-    '--service-account', '780691668337-compute@developer.gserviceaccount.com', # La cuenta de servicio con roles de Compute
-    # --- ¡CRÍTICO: USAR VARIABLES DE SUSTITUCIÓN DE SECRET MANAGER! ---
-    '--set-env-vars', 'GOOGLE_CLIENT_ID=${_GOOGLE_CLIENT_ID},JWT_SECRET=${_JWT_SECRET},GCP_PROJECT_ID=${PROJECT_ID}'
-  ]
-  # --- Definimos las variables de Secret Manager para Cloud Build ---
-  secretEnv: ['_GOOGLE_CLIENT_ID', '_JWT_SECRET'] 
-images:
-- 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-backend/gcp-vm-dashboard-backend:$COMMIT_SHA'
+  # Paso 3: Desplegar la imagen en Cloud Run con los secretos correctos
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Deploy to Cloud Run'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'gcp-vm-dashboard-backend-service'
+      - '--image'
+      - 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-repo/gcp-vm-dashboard-backend-service:$COMMIT_SHA'
+      - '--region'
+      - 'europe-southwest1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--service-account'
+      - '780691668337-compute@developer.gserviceaccount.com'
+      # --- CORRECCIÓN CLAVE ---
+      # Usamos --update-env-vars que es más seguro y la sintaxis está limpia.
+      # Cloud Build reemplazará ${_GOOGLE_CLIENT_ID} y ${_JWT_SECRET} con los valores de los secretos.
+      - '--update-env-vars'
+      - 'GCP_PROJECT_ID=$PROJECT_ID,GOOGLE_CLIENT_ID=${_GOOGLE_CLIENT_ID},JWT_SECRET=${_JWT_SECRET}'
 
-# --- Sección de secretos disponibles (al final del archivo) ---
+# --- Sección de secretos disponibles para TODO el proceso de build ---
+# Esta es la forma correcta y moderna de definir los secretos.
 availableSecrets:
   secretManager:
-  - versionName: projects/$PROJECT_ID/secrets/my-google-client-id/versions/latest # Nombre del secreto en Secret Manager
-    env: '_GOOGLE_CLIENT_ID' # El nombre de la variable de sustitución en Cloud Build
-  - versionName: projects/$PROJECT_ID/secrets/my-backend-jwt-secret/versions/latest # Nombre del secreto en Secret Manager
-    env: '_JWT_SECRET' # El nombre de la variable de sustitución en Cloud Build
+    # Asegúrate de que el nombre del secreto ('my-google-client-id') es EXACTO
+    - versionName: projects/$PROJECT_ID/secrets/my-google-client-id/versions/latest
+      env: '_GOOGLE_CLIENT_ID' # Se crea la variable de sustitución _GOOGLE_CLIENT_ID
+
+    # Asegúrate de que el nombre del secreto ('my-backend-jwt-secret') es EXACTO
+    - versionName: projects/$PROJECT_ID/secrets/my-backend-jwt-secret/versions/latest
+      env: '_JWT_SECRET' # Se crea la variable de sustitución _JWT_SECRET
+
+images:
+  - 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-repo/gcp-vm-dashboard-backend-service:$COMMIT_SHA'
 
 options:
   logging: CLOUD_LOGGING_ONLY
+
 
