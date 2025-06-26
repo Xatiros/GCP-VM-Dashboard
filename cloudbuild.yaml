@@ -1,92 +1,88 @@
-# cloudbuild.yaml
-# Ubicación: gcp-vm-dashboard/cloudbuild.yaml (en la RAÍZ del proyecto)
+# cloudbuild.yaml (Colocar en la RAÍZ del proyecto)
+# VERSIÓN DE DEPURACIÓN - Con valores hardcodeados para el backend.
 
 steps:
-# --- PASOS PARA EL BACKEND (sin cambios aquí) ---
-# Paso 1 (Backend): Construir la imagen Docker del backend
+# --- PASOS PARA EL BACKEND ---
+# Paso 1 (Backend): Construir la imagen
 - name: 'gcr.io/cloud-builders/docker'
-  id: 'build-backend' 
+  id: 'build-backend'
   args: [
-    'build', 
-    '-t', 
-    'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-backend/gcp-vm-dashboard-backend:$COMMIT_SHA', 
-    '.' 
+    'build',
+    '-t',
+    'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-repo/gcp-vm-dashboard-backend-service:$COMMIT_SHA',
+    '.'
   ]
-  dir: 'backend' 
+  dir: 'backend'
 
-# Paso 2 (Backend): Subir la imagen Docker del backend a Artifact Registry
+# Paso 2 (Backend): Subir la imagen
 - name: 'gcr.io/cloud-builders/docker'
-  id: 'push-backend' 
+  id: 'push-backend'
   args: [
-    'push', 
-    'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-backend/gcp-vm-dashboard-backend:$COMMIT_SHA'
+    'push',
+    'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-repo/gcp-vm-dashboard-backend-service:$COMMIT_SHA'
   ]
-  waitFor: ['build-backend'] 
+  waitFor: ['build-backend']
 
-# Paso 3 (Backend): Desplegar el backend en Cloud Run
+# Paso 3 (Backend): Desplegar
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-  id: 'deploy-backend' 
-  entrypoint: 'gcloud' 
+  id: 'deploy-backend'
+  entrypoint: 'gcloud'
   args: [
-    'run', 'deploy', 'gcp-vm-dashboard-backend-service', 
-    '--image', 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-backend/gcp-vm-dashboard-backend:$COMMIT_SHA',
-    '--region', 'europe-southwest1', 
+    'run', 'deploy', 'gcp-vm-dashboard-backend-service',
+    '--image', 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-repo/gcp-vm-dashboard-backend-service:$COMMIT_SHA',
+    '--region', 'europe-southwest1',
     '--platform', 'managed',
-    '--allow-unauthenticated', 
-    '--set-env-vars', 'GOOGLE_CLIENT_ID=${_GOOGLE_CLIENT_ID},JWT_SECRET=${_JWT_SECRET},GCP_PROJECT_ID=${PROJECT_ID}'
+    '--allow-unauthenticated',
+    # --- CAMBIO CLAVE: VALORES HARDCODEADOS (TEMPORAL) ---
+    # Se eliminó la dependencia de Secret Manager para depurar.
+    '--set-env-vars', 'GCP_PROJECT_ID=$PROJECT_ID,GOOGLE_CLIENT_ID=780691668337-fagffk8595v6cdasflrj5pbpcoloc96d.apps.googleusercontent.com,JWT_SECRET=ESTE_ES_UN_SECRETO_DE_PRUEBA_MUY_LARGO_Y_SEGURO_CAMBIAME'
   ]
-  waitFor: ['push-backend'] 
-  secretEnv: ['_GOOGLE_CLIENT_ID', '_JWT_SECRET'] 
+  waitFor: ['push-backend']
 
 # --- PASOS PARA EL FRONTEND ---
-# Paso 4 (Frontend): Construir la imagen Docker del frontend
+# Paso 4 (Frontend): Construir la imagen
 - name: 'gcr.io/cloud-builders/docker'
-  id: 'build-frontend' 
+  id: 'build-frontend'
   args: [
-    'build', 
-    '-t', 
-    'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA', 
-    '.' , 
-    # --- ¡CAMBIO CLAVE AQUÍ: PASAR VARIABLE COMO BUILD-ARG! ---
+    'build',
+    '-t',
+    'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-repo/gcp-vm-dashboard-frontend-service:$COMMIT_SHA',
+    '.',
     '--build-arg', 'VITE_APP_BACKEND_API_BASE_URL=https://gcp-vm-dashboard-backend-service-780691668337.europe-southwest1.run.app/api'
   ]
-  dir: 'frontend' # El Dockerfile y código del frontend están en 'frontend/'
+  dir: 'frontend'
 
-# Paso 5 (Frontend): Subir la imagen Docker del frontend a Artifact Registry
+# Paso 5 (Frontend): Subir la imagen
 - name: 'gcr.io/cloud-builders/docker'
-  id: 'push-frontend' 
+  id: 'push-frontend'
   args: [
-    'push', 
-    'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA'
+    'push',
+    'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-repo/gcp-vm-dashboard-frontend-service:$COMMIT_SHA'
   ]
-  waitFor: ['build-frontend'] 
+  waitFor: ['build-frontend']
 
-# Paso 6 (Frontend): Desplegar el frontend en Cloud Run
+# Paso 6 (Frontend): Desplegar
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-  id: 'deploy-frontend' 
-  entrypoint: 'gcloud' 
+  id: 'deploy-frontend'
+  entrypoint: 'gcloud'
   args: [
-    'run', 'deploy', 'gcp-vm-dashboard-frontend-service', 
-    '--image', 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA', 
-    '--region', 'europe-southwest1', 
+    'run', 'deploy', 'gcp-vm-dashboard-frontend-service',
+    '--image', 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-repo/gcp-vm-dashboard-frontend-service:$COMMIT_SHA',
+    '--region', 'europe-southwest1',
     '--platform', 'managed',
-    '--allow-unauthenticated', 
-    # --- ¡MANTENER ESTA LÍNEA! Es para las variables de entorno de EJECUCIÓN ---
-    '--set-env-vars', 'VITE_APP_BACKEND_API_BASE_URL=https://gcp-vm-dashboard-backend-service-780691668337.europe-southwest1.run.app/api'
+    '--allow-unauthenticated'
   ]
-  waitFor: ['push-frontend', 'deploy-backend'] 
+  waitFor: ['push-frontend', 'deploy-backend']
 
-# --- Definición de Secretos (para el backend) y Opciones Globales ---
+# --- Definición de Imágenes y Opciones Globales ---
 images:
-- 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-backend/gcp-vm-dashboard-backend:$COMMIT_SHA'
-- 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA'
+- 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-repo/gcp-vm-dashboard-backend-service:$COMMIT_SHA'
+- 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-repo/gcp-vm-dashboard-frontend-service:$COMMIT_SHA'
 
-availableSecrets:
-  secretManager:
-  - versionName: projects/$PROJECT_ID/secrets/my-google-client-id/versions/latest 
-    env: '_GOOGLE_CLIENT_ID' 
-  - versionName: projects/$PROJECT_ID/secrets/my-backend-jwt-secret/versions/latest 
-    env: '_JWT_SECRET' 
+# La sección de secretos se ha eliminado temporalmente para la depuración
+# availableSecrets:
+#   secretManager:
+#   - versionName: ...
 
 options:
   logging: CLOUD_LOGGING_ONLY
