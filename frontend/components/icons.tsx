@@ -1,5 +1,6 @@
 // frontend/components/icons.tsx
 // Ubicación: gcp-vm-dashboard/frontend/components/icons.tsx
+// VERSIÓN FINAL Y COMPLETA - SIN DUPLICADOS
 
 import React from 'react';
 
@@ -56,6 +57,7 @@ export const StopIcon = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+// Icono para CPU o Machine Type
 export const ChipIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 21v-1.5M15.75 3v1.5M19.5 8.25H21M19.5 12H21M19.5 15.75H21M15.75 21v-1.5M12 5.25v-1.5m0 15v1.5m-3.75-18h-1.5m15 0h-1.5M12 9.75a2.25 2.25 0 0 1 2.25 2.25v.001a2.25 2.25 0 0 1-2.25 2.25v-.001a2.25 2.25 0 0 1-2.25-2.25v-.001A2.25 2.25 0 0 1 12 9.75Z" />
@@ -88,68 +90,23 @@ export const SearchIcon = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-// Icono de Ubicación/Zona
-export const LocationMarkerIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-  </svg>
-);
 
-// --- CAMBIO CLAVE: Icono de Engranaje/Procesando (MÁS SENCILLO Y COMPACTO) ---
-export const CogIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24">
-    {/* Un path más simple y legible para un engranaje */}
-    <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 18a8 8 0 110-16 8 8 0 010 16zm0-13a1 1 0 011 1v2a1 1 0 01-2 0v-2a1 1 0 011-1zm0 8a1 1 0 011 1v2a1 1 0 01-2 0v-2a1 1 0 011-1zm6-4a1 1 0 011 1v2a1 1 0 01-2 0v-2a1 1 0 011-1zM6 10a1 1 0 011 1v2a1 1 0 01-2 0v-2a1 1 0 011-1zm10-4a1 1 0 011 1v2a1 1 0 01-2 0V7a1 1 0 011-1zm-8 0a1 1 0 011 1v2a1 1 0 01-2 0V7a1 1 0 011-1z"/>
-  </svg>
-);
+// --- ICONOS ADICIONALES DEL FICHERO ORIGINAL ---
 
-// Icono de Descarga
-export const DownloadIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-  </svg>
-);
-
-// Icono de Nube (para el Header)
-export const CloudIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a4 4 0 004-4V8a2 2 0 00-2-2h-1.586a1 1 0 01-.707-.293l-1.414-1.414A1 1 0 009.586 3H7a2 2 0 00-2 2v10z" />
-  </svg>
-);
-
-// Icono de Refrescar (para el botón de actualizar)
-export const RefreshIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004 12c0 2.21.817 4.212 2.164 5.702m-1.424 2.87L5 20m14 0l-.424-.572M10 13l2.87-1.424" />
-  </svg>
-);
-
-// Icono de Búsqueda
-export const SearchIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-  </svg>
-);
-
-// Icono de Terminal (para "Más opciones de conexión")
 export const TerminalIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h7M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+  <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 7.5 3 12m0 0 3.75 4.5M3 12h18" />
   </svg>
 );
 
-// --- NUEVOS ICONOS PARA CPU Y RAM ---
-// Icono de CPU
-export const CpuIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7m0-14V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2v-7m-7-7H5m14 0h-5" />
-  </svg>
+export const MemoryChipIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75v4.5m0-4.5h-4.5m4.5 0L15 9m5.25 11.25v-4.5m0 4.5h-4.5m4.5 0L15 15M9 15l6-6m-6 6 6 6m-6-6-6 6" />
+    </svg>
 );
 
-// Icono de RAM
-export const RamIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v2a2 2 0 01-2 2H5a2 2 0 01-2-2v-2a2 2 0 012-2m14 0V9a2 2 0 00-2-2H5a2 2 0 00-2 2v2m14 0v2m-4-2h.01M16 11h.01M8 11h.01M4 15h.01M16 15h.01M8 15h.01" />
-  </svg>
+export const DownloadIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+    </svg>
 );
