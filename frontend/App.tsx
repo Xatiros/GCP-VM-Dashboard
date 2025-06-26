@@ -13,17 +13,14 @@ import { RefreshIcon, SearchIcon, CogIcon } from './components/icons';
 import { AuthButton } from './components/AuthButton';
 
 // Define la URL base de la API del backend.
-// En desarrollo local (npm run dev), import.meta.env.VITE_APP_BACKEND_API_BASE_URL estará indefinida,
-// por lo que usará 'http://localhost:8080/api'.
-// En producción (Cloud Build), VITE_APP_BACKEND_API_BASE_URL se inyectará desde tu cloudbuild.yaml de frontend.
 const API_BASE_FOR_FRONTEND = import.meta.env.VITE_APP_BACKEND_API_BASE_URL || 'http://localhost:8080/api';
 
 // La URL específica para la autenticación de Google
 const BACKEND_AUTH_ENDPOINT_URL = `${API_BASE_FOR_FRONTEND}/auth/google`;
 
 // Configuración del polling
-const GLOBAL_POLLING_INTERVAL_MS = 30000; // Polling global más lento: 30 segundos
-const TRANSITION_POLLING_INTERVAL_MS = 5000; // Polling rápido para VMs en transición: 5 segundos
+const GLOBAL_POLLING_INTERVAL_MS = 30000; 
+const TRANSITION_POLLING_INTERVAL_MS = 5000; 
 
 const App: React.FC = () => {
   const [vms, setVms] = useState<VirtualMachine[]>([]);
@@ -41,6 +38,7 @@ const App: React.FC = () => {
 
   const [appToken, setAppToken] = useState<string | null>(localStorage.getItem('appToken'));
   const [userEmail, setUserEmail] = useState<string | null>(localStorage.getItem('userEmail'));
+  const [userRole, setUserRole] = useState<string | null>(null); // <-- NUEVO ESTADO PARA EL ROL
   const [isAuthenticating, setIsAuthenticating] = useState(false);
 
   const GCP_PROJECT_ID_REAL = 'puestos-de-trabajo-potentes'; 
@@ -109,6 +107,12 @@ const App: React.FC = () => {
   }, [loadVMs]);
 
   useEffect(() => {
+    // Intentar cargar el rol del usuario desde localStorage al inicio
+    const storedRole = localStorage.getItem('userRole');
+    if (storedRole) {
+      setUserRole(storedRole);
+    }
+
     if (appToken) { 
       loadVMs(); 
       showToast(`Actualización global de VMs cada ${GLOBAL_POLLING_INTERVAL_MS / 1000} segundos iniciada.`);
@@ -222,8 +226,10 @@ const App: React.FC = () => {
       const data = await response.json();
       localStorage.setItem('appToken', data.token); 
       localStorage.setItem('userEmail', data.user.email); 
+      localStorage.setItem('userRole', data.user.role); // <-- GUARDAR EL ROL EN LOCALSTORAGE
       setAppToken(data.token);
       setUserEmail(data.user.email);
+      setUserRole(data.user.role); // <-- ACTUALIZAR EL ESTADO DEL ROL
       showToast(`Bienvenido, ${data.user.name || data.user.email}!`);
 
     } catch (err: any) {
@@ -239,8 +245,10 @@ const App: React.FC = () => {
   const handleLogout = () => {
     localStorage.removeItem('appToken');
     localStorage.removeItem('userEmail');
+    localStorage.removeItem('userRole'); // <-- ELIMINAR EL ROL DE LOCALSTORAGE
     setAppToken(null); 
     setUserEmail(null);
+    setUserRole(null); // <-- LIMPIAR EL ESTADO DEL ROL
     setVms([]); 
     showToast('Sesión cerrada.');
   };
@@ -315,6 +323,7 @@ const App: React.FC = () => {
         selectedProject={selectedProject}
         onProjectChange={setSelectedProject}
         userEmail={userEmail}
+        userRole={userRole} {/* <-- PASAR EL ROL AL HEADER */}
         onLogout={handleLogout}
       />
       <main className="flex-grow p-4 md:p-6 lg:p-8">
