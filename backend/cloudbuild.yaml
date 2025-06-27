@@ -1,0 +1,56 @@
+# backend/cloudbuild.yaml
+# Versión final y correcta.
+
+steps:
+  # Paso 1: Construir la imagen Docker
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-repo/gcp-vm-dashboard-backend-service:$COMMIT_SHA'
+      - '.'
+    dir: 'backend'
+
+  # Paso 2: Subir la imagen a Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-repo/gcp-vm-dashboard-backend-service:$COMMIT_SHA'
+
+  # Paso 3: Desplegar en Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'gcp-vm-dashboard-backend-service'
+      - '--image'
+      - 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-repo/gcp-vm-dashboard-backend-service:$COMMIT_SHA'
+      - '--region'
+      - 'europe-southwest1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--service-account'
+      - '780691668337-compute@developer.gserviceaccount.com'
+      - '--set-env-vars'
+      - 'GOOGLE_CLIENT_ID=${_GOOGLE_CLIENT_ID},JWT_SECRET=${_JWT_SECRET},GCP_PROJECT_ID=$PROJECT_ID'
+
+# --- Sección de secretos disponibles para el build ---
+availableSecrets:
+  secretManager:
+    - versionName: projects/$PROJECT_ID/secrets/my-google-client-id/versions/latest
+      env: '_GOOGLE_CLIENT_ID'
+    - versionName: projects/$PROJECT_ID/secrets/my-backend-jwt-secret/versions/latest
+      env: '_JWT_SECRET'
+
+images:
+  - 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-repo/gcp-vm-dashboard-backend-service:$COMMIT_SHA'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+
+
+
+
