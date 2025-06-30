@@ -2,14 +2,14 @@
 # Ubicación: gcp-vm-dashboard/cloudbuild.yaml (en la RAÍZ del proyecto)
 
 steps:
-# --- PASOS PARA EL BACKEND ---
+# --- PASOS PARA EL BACKEND (sin cambios aquí) ---
 # Paso 1 (Backend): Construir la imagen Docker del backend
 - name: 'gcr.io/cloud-builders/docker'
   id: 'build-backend' 
   args: [
     'build', 
     '-t', 
-    'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-repo/gcp-vm-dashboard-backend-service:$COMMIT_SHA', 
+    'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-backend/gcp-vm-dashboard-backend:$COMMIT_SHA', 
     '.' 
   ]
   dir: 'backend' 
@@ -19,35 +19,24 @@ steps:
   id: 'push-backend' 
   args: [
     'push', 
-    'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-repo/gcp-vm-dashboard-backend-service:$COMMIT_SHA'
+    'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-backend/gcp-vm-dashboard-backend:$COMMIT_SHA'
   ]
   waitFor: ['build-backend'] 
 
 # Paso 3 (Backend): Desplegar el backend en Cloud Run
 - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
   id: 'deploy-backend' 
-  entrypoint: 'bash' # <-- CAMBIO: Usar bash como entrypoint
+  entrypoint: 'gcloud' 
   args: [
-    '-c', # <-- CAMBIO: Argumento para bash para ejecutar una cadena de comandos
-    |
-      # --- INICIO WORKAROUND para "defined without being used" ---
-      # Esto fuerza a Cloud Build a reconocer el uso de las variables de secretEnv.
-      # Estos 'echo' NO aparecerán en los logs de tu servicio de Cloud Run, solo en los logs de Cloud Build.
-      echo "DEBUG: Usando _GOOGLE_CLIENT_ID: $MY_GOOGLE_CLIENT_ID"
-      echo "DEBUG: Usando _JWT_SECRET: $MY_JWT_SECRET"
-      # --- FIN WORKAROUND ---
-
-      # Ahora ejecuta el comando gcloud run deploy real
-      gcloud run deploy gcp-vm-dashboard-backend-service \
-        --image europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-repo/gcp-vm-dashboard-backend-service:$COMMIT_SHA \
-        --region europe-southwest1 \
-        --platform managed \
-        --allow-unauthenticated \
-        --service-account 780691668337-compute@developer.gserviceaccount.com \
-        --set-env-vars=GOOGLE_CLIENT_ID=$$MY_GOOGLE_CLIENT_ID,JWT_SECRET=$$MY_JWT_SECRET,GCP_PROJECT_ID=$PROJECT_ID
+    'run', 'deploy', 'gcp-vm-dashboard-backend-service', 
+    '--image', 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-backend/gcp-vm-dashboard-backend:$COMMIT_SHA',
+    '--region', 'europe-southwest1', 
+    '--platform', 'managed',
+    '--allow-unauthenticated', 
+    '--set-env-vars', 'GOOGLE_CLIENT_ID=${_GOOGLE_CLIENT_ID},JWT_SECRET=${_JWT_SECRET},GCP_PROJECT_ID=${PROJECT_ID}'
   ]
   waitFor: ['push-backend'] 
-  secretEnv: ['MY_GOOGLE_CLIENT_ID', 'MY_JWT_SECRET'] # <-- Mantenemos esto aquí, y los nombres deben coincidir con availableSecrets
+  secretEnv: ['_GOOGLE_CLIENT_ID', '_JWT_SECRET'] 
 
 # --- PASOS PARA EL FRONTEND ---
 # Paso 4 (Frontend): Construir la imagen Docker del frontend
@@ -58,9 +47,10 @@ steps:
     '-t', 
     'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA', 
     '.' , 
+    # --- ¡CAMBIO CLAVE AQUÍ: PASAR VARIABLE COMO BUILD-ARG! ---
     '--build-arg', 'VITE_APP_BACKEND_API_BASE_URL=https://gcp-vm-dashboard-backend-service-780691668337.europe-southwest1.run.app/api'
   ]
-  dir: 'frontend' 
+  dir: 'frontend' # El Dockerfile y código del frontend están en 'frontend/'
 
 # Paso 5 (Frontend): Subir la imagen Docker del frontend a Artifact Registry
 - name: 'gcr.io/cloud-builders/docker'
@@ -81,23 +71,22 @@ steps:
     '--region', 'europe-southwest1', 
     '--platform', 'managed',
     '--allow-unauthenticated', 
+    # --- ¡MANTENER ESTA LÍNEA! Es para las variables de entorno de EJECUCIÓN ---
     '--set-env-vars', 'VITE_APP_BACKEND_API_BASE_URL=https://gcp-vm-dashboard-backend-service-780691668337.europe-southwest1.run.app/api'
   ]
   waitFor: ['push-frontend', 'deploy-backend'] 
 
-# --- Definición de Secretos Globales (usados por --update-secrets) y Opciones Globales ---
+# --- Definición de Secretos (para el backend) y Opciones Globales ---
 images:
 - 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-backend/gcp-vm-dashboard-backend:$COMMIT_SHA'
 - 'europe-southwest1-docker.pkg.dev/$PROJECT_ID/gcp-vm-dashboard-frontend/gcp-vm-dashboard-frontend:$COMMIT_SHA'
 
-availableSecrets: 
+availableSecrets:
   secretManager:
-  # Los nombres de Secret Manager DEBEN ser 'my-google-client-id' y 'my-backend-jwt-secret'
-  # Y los 'env' que aquí se definen (MY_GOOGLE_CLIENT_ID, MY_JWT_SECRET) se usarán con el prefijo $$ en los args
   - versionName: projects/$PROJECT_ID/secrets/my-google-client-id/versions/latest 
-    env: 'MY_GOOGLE_CLIENT_ID' 
+    env: '_GOOGLE_CLIENT_ID' 
   - versionName: projects/$PROJECT_ID/secrets/my-backend-jwt-secret/versions/latest 
-    env: 'MY_JWT_SECRET' 
+    env: '_JWT_SECRET' 
 
 options:
   logging: CLOUD_LOGGING_ONLY
